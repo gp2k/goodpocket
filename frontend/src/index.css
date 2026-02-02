@@ -1,0 +1,78 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+/* Radial Mindmap Styles */
+.radial-mindmap-container {
+  background: linear-gradient(135deg, #fafbfc 0%, #f3f4f6 50%, #e5e7eb 100%);
+  border-radius: 16px;
+  padding: 24px;
+}
+
+.radial-mindmap {
+  position: relative;
+}
+
+/* Root node glow effect */
+.root-node {
+  position: relative;
+}
+
+.root-node::before {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 20px;
+  background: linear-gradient(45deg, #6366f1, #8b5cf6, #a855f7);
+  opacity: 0.3;
+  z-index: -1;
+  filter: blur(10px);
+}
+
+/* Cluster node styles (hexagon shape) */
+.cluster-node {
+  position: relative;
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+}
+
+.cluster-node::before {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
+  background: linear-gradient(45deg, #f59e0b, #d97706);
+  opacity: 0;
+  z-index: -1;
+  transition: opacity 0.2s ease;
+}
+
+.cluster-node:hover::before {
+  opacity: 0.3;
+}
+
+/* Bookmark node styles */
+.bookmark-node {
+  transition: all 0.15s ease;
+  background: linear-gradient(135deg, #ffffff 0%, #f9fafb 100%);
+}
+
+.bookmark-node:hover {
+  transform: scale(1.03);
+  box-shadow: 0 4px 16px rgba(59, 130, 246, 0.2);
+}
+
+/* Responsive styles for radial mindmap */
+@media (max-width: 768px) {
+  .radial-mindmap-container {
+    padding: 12px;
+  }
+  
+  .radial-mindmap {
+    transform: scale(0.6);
+    transform-origin: top center;
+  }
+}
