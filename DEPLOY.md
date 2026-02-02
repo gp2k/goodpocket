@@ -133,10 +133,10 @@ Railway URL을 확인한 뒤 `frontend/.env.production`의 `VITE_API_URL`을 실
 
 Backend `backend/app/main.py`의 `allow_origins`에 사용 중인 Frontend 도메인을 추가합니다.
 
-### Railway "Build timed out"
+### Railway "Build timed out" / "importing to docker" 후 실패
 
-- **원인:** Backend 의존성(torch, sentence-transformers 등) 설치에 시간이 걸려 전체 빌드가 타임아웃됨.
-- **해결:** Dockerfile이 단일 스테이지로 되어 PyPI 사전 빌드 휠을 사용하도록 되어 있음. 그래도 타임아웃이 나면 Railway **Project** → **Settings**에서 빌드 타임아웃을 늘리거나, 빌드 로그에서 어느 단계에서 멈추는지 확인 후 알려주세요.
+- **원인:** (1) 빌드 단계가 오래 걸리거나 (2) **이미지가 너무 커서** 푸시/임포트 단계에서 타임아웃됨 (torch + CUDA 조합 시 이미지가 수 GB).
+- **해결:** Dockerfile에서 **CPU 전용 PyTorch**를 먼저 설치하도록 되어 있음 (`torch --index-url https://download.pytorch.org/whl/cpu`). Railway는 GPU가 없으므로 CPU 버전으로 충분하며, 이미지 크기가 줄어 푸시가 완료되기 쉬움. 그래도 실패하면 Railway **Project** → **Settings**에서 빌드 타임아웃을 늘리거나, 로그 끝 단계를 확인하세요.
 
 ### Railway PORT
 

@@ -13,9 +13,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python deps in one step (faster than multi-stage: uses PyPI binaries)
+# Install CPU-only PyTorch first (Railway has no GPU; avoids ~3GB CUDA deps and push timeout)
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu \
+    && pip install --no-cache-dir -r requirements.txt
 
 # Application code
 COPY ./app ./app
