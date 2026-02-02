@@ -44,9 +44,7 @@ RUN chown -R appuser:appuser /app
 # Switch to non-root user
 USER appuser
 
-# Pre-download the embedding model during build
-# This speeds up cold starts on Cloud Run
-RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')"
+# Embedding model is downloaded on first request (avoids long build timeouts on Railway)
 
 # Environment variables
 ENV PYTHONUNBUFFERED=1
