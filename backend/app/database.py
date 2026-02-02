@@ -3,6 +3,8 @@ Database connection management using asyncpg.
 Provides connection pooling and query helpers.
 """
 import asyncio
+import ipaddress
+import re
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator, Any, Optional
 import asyncpg
@@ -17,6 +19,24 @@ logger = structlog.get_logger()
 _pool: Optional[asyncpg.Pool] = None
 
 
+def _normalize_database_url(url: str) -> str:
+    """
+    Remove brackets around hostname when it is not an IPv6 address.
+    Python's urllib treats [host] as IPv6 literal and validates it; Supabase/Railway
+    sometimes provide DATABASE_URL with bracketed hostname (e.g. @[db.xxx.supabase.co]:5432),
+    which causes ValueError. We strip brackets for hostnames so asyncpg/urllib accept the DSN.
+    """
+    match = re.search(r"@\[([^\]]+)\](?=:\d+|/|$)", url)
+    if not match:
+        return url
+    host = match.group(1)
+    try:
+        ipaddress.ip_address(host)
+        return url  # valid IPv4/IPv6, keep as-is (brackets required for IPv6 in URLs)
+    except ValueError:
+        return url.replace(f"@[{host}]", f"@{host}", 1)
+
+
 async def init_db() -> None:
     """Initialize database connection pool."""
     global _pool
@@ -24,8 +44,9 @@ async def init_db() -> None:
     
     logger.info("Initializing database connection pool")
     
+    dsn = _normalize_database_url(settings.database_url)
     _pool = await asyncpg.create_pool(
-        dsn=settings.database_url,
+        dsn=dsn,
         min_size=2,
         max_size=10,
         command_timeout=60,

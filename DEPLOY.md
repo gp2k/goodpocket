@@ -141,7 +141,12 @@ Backend `backend/app/main.py`의 `allow_origins`에 사용 중인 Frontend 도�
 ### Railway 배포 후 바로 크래시 (ValidationError: 5 validation errors for Settings)
 
 - **원인:** 백엔드가 필요로 하는 **환경 변수가 Railway에 설정되지 않음**. 로그에 `supabase_url`, `supabase_anon_key`, `supabase_service_role_key`, `supabase_jwt_secret`, `database_url` — Field required 가 보이면 이 경우입니다.
-- **해결:** Railway **Project** → **Variables** (또는 해당 **Service** → **Variables**)에서 위 5개 변수와 `BATCH_JOB_SECRET`을 추가하세요. 값은 Supabase Dashboard (Project Settings → API, Database)에서 복사합니다. 저장 후 재배포(또는 자동 재시작)되면 앱이 기동합니다.
+- **해결:** Railway **Project** → **Variables** (또는 해당 **Service** → **Variables**)에서 위 5개 변수와 `BATCH_JOB_SECRET`을 추가하세요. 값은 Supabase Dashboard (Project Settings → API, Database)에서 복사합니다. **공유 변수(Shared Variables)**를 쓰는 경우, 해당 **서비스** → **Variables** 탭에서 "Add All" 또는 개별 변수를 서비스에 연결해야 합니다. 저장 후 재배포(또는 자동 재시작)되면 앱이 기동합니다.
+
+### Railway 크래시: `ValueError: 'db.xxx.supabase.co' does not appear to be an IPv4 or IPv6 address`
+
+- **원인:** `DATABASE_URL`에 호스트가 대괄호로 감싸여 있는 경우(예: `postgresql://...@[db.xxx.supabase.co]:5432/...`) Python의 URL 파서가 이를 IPv6으로 간주해 검사하다 도메인 이름에서 실패합니다.
+- **해결:** 백엔드 코드에서 DSN을 넘기기 전에 호스트명의 대괄호를 제거하는 정규화를 적용해 두었습니다. 최신 코드로 배포하면 해결됩니다. Railway에서 `DATABASE_URL`을 대괄호 없이 `...@db.xxx.supabase.co:5432/...` 형태로 넣어도 동작합니다.
 
 ### Railway PORT
 
