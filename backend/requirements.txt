@@ -20,10 +20,10 @@ lxml>=5.1.0
 yake>=0.4.8
 kiwipiepy>=0.18.0  # Korean morphological analyzer
 
-# ML - Embeddings
+# ML - Embeddings (numpy<2 for YAKE compatibility)
 sentence-transformers>=2.2.2
 torch>=2.2.0
-numpy>=1.26.0
+numpy>=1.26.0,<2.0.0
 
 # ML - Clustering
 hdbscan>=0.8.33
