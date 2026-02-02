@@ -23,11 +23,14 @@ wheels/
 .installed.cfg
 *.egg
 
-# Environment variables
+# Environment variables (do not commit secrets)
 .env
 .env.local
 .env.*.local
+.env.production
 backend/.env
+frontend/.env
+frontend/.env.production
 
 # IDE
 .idea/
