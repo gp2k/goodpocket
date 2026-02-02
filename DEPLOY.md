@@ -138,6 +138,11 @@ Backend `backend/app/main.py`의 `allow_origins`에 사용 중인 Frontend 도�
 - **원인:** (1) 빌드 단계가 오래 걸리거나 (2) **이미지가 너무 커서** 푸시/임포트 단계에서 타임아웃됨 (torch + CUDA 조합 시 이미지가 수 GB).
 - **해결:** Dockerfile에서 **CPU 전용 PyTorch**를 먼저 설치하도록 되어 있음 (`torch --index-url https://download.pytorch.org/whl/cpu`). Railway는 GPU가 없으므로 CPU 버전으로 충분하며, 이미지 크기가 줄어 푸시가 완료되기 쉬움. 그래도 실패하면 Railway **Project** → **Settings**에서 빌드 타임아웃을 늘리거나, 로그 끝 단계를 확인하세요.
 
+### Railway 배포 후 바로 크래시 (ValidationError: 5 validation errors for Settings)
+
+- **원인:** 백엔드가 필요로 하는 **환경 변수가 Railway에 설정되지 않음**. 로그에 `supabase_url`, `supabase_anon_key`, `supabase_service_role_key`, `supabase_jwt_secret`, `database_url` — Field required 가 보이면 이 경우입니다.
+- **해결:** Railway **Project** → **Variables** (또는 해당 **Service** → **Variables**)에서 위 5개 변수와 `BATCH_JOB_SECRET`을 추가하세요. 값은 Supabase Dashboard (Project Settings → API, Database)에서 복사합니다. 저장 후 재배포(또는 자동 재시작)되면 앱이 기동합니다.
+
 ### Railway PORT
 
 Railway는 `PORT` 환경변수를 제공합니다. `Procfile`·`nixpacks.toml`에서 `$PORT`를 사용하므로 별도 설정 없이 동작합니다.

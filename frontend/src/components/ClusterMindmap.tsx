@@ -6,8 +6,8 @@ import {
   forceManyBody,
   forceCenter,
   forceCollide,
-  SimulationNodeDatum,
-  SimulationLinkDatum,
+  type SimulationNodeDatum,
+  type SimulationLinkDatum,
 } from 'd3-force'
 
 interface ClusterMindmapProps {
@@ -26,6 +26,10 @@ interface MindmapNode extends SimulationNodeDatum {
   url?: string
   clusterId?: number
   radius: number
+  x?: number
+  y?: number
+  fx?: number
+  fy?: number
 }
 
 interface MindmapLink extends SimulationLinkDatum<MindmapNode> {
@@ -188,15 +192,15 @@ export default function ClusterMindmap({ clusters }: ClusterMindmapProps) {
     // Different simulation settings based on whether initial layout is done
     const simulation = forceSimulation<MindmapNode>(newNodes)
       .force('link', forceLink<MindmapNode, MindmapLink>(newLinks)
-        .id(d => d.id)
-        .distance(d => {
+        .id((d: MindmapNode) => d.id)
+        .distance((d: SimulationLinkDatum<MindmapNode>) => {
           const source = d.source as MindmapNode
           const target = d.target as MindmapNode
           if (source.type === 'root') return 250
           if (target.type === 'bookmark') return 160
           return 150
         })
-        .strength(d => {
+        .strength((d: SimulationLinkDatum<MindmapNode>) => {
           const target = d.target as MindmapNode
           // Weaker link strength for bookmarks when clusters are fixed
           if (initialLayoutDone && target.type === 'bookmark') return 0.5
@@ -204,7 +208,7 @@ export default function ClusterMindmap({ clusters }: ClusterMindmapProps) {
         })
       )
       .force('charge', forceManyBody<MindmapNode>()
-        .strength(d => {
+        .strength((d: MindmapNode) => {
           if (d.type === 'root') return -1500
           if (d.type === 'cluster') return initialLayoutDone ? -200 : -1000
           return -300  // Bookmarks repel each other
@@ -212,7 +216,7 @@ export default function ClusterMindmap({ clusters }: ClusterMindmapProps) {
       )
       .force('center', forceCenter(CENTER_X, CENTER_Y).strength(initialLayoutDone ? 0 : 0.02))
       .force('collision', forceCollide<MindmapNode>()
-        .radius(d => {
+        .radius((d: MindmapNode) => {
           if (d.type === 'cluster') return d.radius + 70
           if (d.type === 'root') return d.radius + 50
           return d.radius + 35
