@@ -133,6 +133,11 @@ Railway URL을 확인한 뒤 `frontend/.env.production`의 `VITE_API_URL`을 실
 
 Backend `backend/app/main.py`의 `allow_origins`에 사용 중인 Frontend 도메인을 추가합니다.
 
+### Railway "Build timed out"
+
+- **원인:** Backend 의존성(torch, sentence-transformers 등) 설치에 시간이 걸려 전체 빌드가 타임아웃됨.
+- **해결:** Dockerfile이 단일 스테이지로 되어 PyPI 사전 빌드 휠을 사용하도록 되어 있음. 그래도 타임아웃이 나면 Railway **Project** → **Settings**에서 빌드 타임아웃을 늘리거나, 빌드 로그에서 어느 단계에서 멈추는지 확인 후 알려주세요.
+
 ### Railway PORT
 
 Railway는 `PORT` 환경변수를 제공합니다. `Procfile`·`nixpacks.toml`에서 `$PORT`를 사용하므로 별도 설정 없이 동작합니다.
