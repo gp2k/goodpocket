@@ -22,11 +22,23 @@ async function api<T>(endpoint: string, options: ApiOptions = {}): Promise<T> {
   const { method = 'GET', body } = options
   const headers = await getAuthHeader()
 
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+  const url = `${API_BASE_URL}${endpoint}`
+  const response = await fetch(url, {
     method,
     headers,
     body: body ? JSON.stringify(body) : undefined,
   })
+
+  const contentType = response.headers.get('content-type') || ''
+  if (!contentType.includes('application/json')) {
+    const text = await response.text()
+    if (text.trimStart().startsWith('<')) {
+      throw new Error(
+        'API 서버에 연결할 수 없습니다. 배포 환경에서는 VITE_API_URL(Railway 주소)이 설정되어 있어야 합니다.'
+      )
+    }
+    throw new Error(response.ok ? 'Invalid response' : `HTTP ${response.status}`)
+  }
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({ detail: 'Unknown error' }))

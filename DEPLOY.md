@@ -103,10 +103,12 @@ Railway URL을 확인한 뒤 `frontend/.env.production`의 `VITE_API_URL`을 실
 ## 3단계: Supabase 설정 업데이트
 
 1. Supabase Dashboard > **Authentication** > **URL Configuration**
-2. **Site URL**: `https://goodpocket.pages.dev` (또는 사용 중인 Cloudflare Pages 도메인)
+2. **Site URL**: `https://goodpocket.pages.dev` (또는 사용 중인 Cloudflare Pages 도메인)  
+   - **주의:** 이 값을 `http://localhost:3000` 등으로 두면, 프로덕션에서 OAuth 로그인 후에도 **localhost로 리다이렉트**됩니다. 프로덕션 도메인을 쓰는 경우 반드시 여기를 프로덕션 URL로 설정하세요.
 3. **Redirect URLs**에 추가:
    - `https://goodpocket.pages.dev/`
    - `https://goodpocket.pages.dev/**`
+   - 로컬 개발용: `http://localhost:5173/`, `http://localhost:3000/` (필요 시)
    - 커스텀 도메인을 쓰면 해당 도메인도 추가
 
 ---
@@ -185,13 +187,14 @@ GitHub으로 로그인도 쓰는 경우:
 | `VITE_SUPABASE_ANON_KEY` | Supabase anon key |
 | `VITE_API_URL` | **Railway 백엔드 URL** (예: `https://xxx.up.railway.app`). **반드시 https로 끝나야 하며, 끝에 `/` 없이** |
 
-`VITE_API_URL`이 비어 있거나 `http://localhost:8000`이면 프로덕션에서 API 요청이 실패합니다. 값 수정 후 **다시 빌드(재배포)** 해야 반영됩니다.
+`VITE_API_URL`이 비어 있거나 `http://localhost:8000`이면 프로덕션에서 API 요청이 **같은 도메인(Cloudflare Pages)** 으로 가서 HTML이 돌아오고, `"<!DOCTYPE "... is not valid JSON` 오류가 납니다. Railway URL로 설정한 뒤 **다시 빌드(재배포)** 해야 반영됩니다.
 
 ### 2. Supabase URL 설정
 
 **Supabase Dashboard > Authentication > URL Configuration**에서:
 
-- **Site URL**: 프로덕션 주소 (예: `https://goodpocket.pages.dev`)
+- **Site URL**: 프로덕션 주소 (예: `https://goodpocket.pages.dev`)  
+  **Site URL이 `http://localhost:3000` 등이면**, 프로덕션에서 Google OAuth 로그인 후 **localhost로 리다이렉트**되어 "연결할 수 없음"이 납니다. 반드시 프로덕션 URL로 설정하세요.
 - **Redirect URLs**에 다음이 포함되어 있는지:
   - `https://goodpocket.pages.dev/`
   - `https://goodpocket.pages.dev/**`
@@ -225,6 +228,17 @@ GitHub으로 로그인도 쓰는 경우:
 - **해결:** Backend 서비스 **Settings** → **Root Directory**를 `backend`로 설정한 뒤 다시 배포.
 - 프로젝트를 지우고, **Empty project** → **Empty Service** 생성 → Root Directory `backend` 설정 → **Connect Repo** 순서로 다시 시도해도 됩니다.
 
+### Cloudflare 배포판에서 "Unexpected token '<', \"<!DOCTYPE \"... is not valid JSON\" / 북마크 저장 실패
+
+- **원인:** Cloudflare Pages 빌드 시 **VITE_API_URL**이 비어 있거나 잘못됨. API 요청이 Railway가 아니라 같은 도메인(goodpocket.pages.dev)으로 가서, 존재하지 않는 경로에 대해 HTML(index.html 등)이 반환되고, 프론트가 이를 JSON으로 파싱하다 에러 발생.
+- **해결:** Cloudflare Dashboard > 해당 Pages 프로젝트 > **Settings** > **Environment variables** (Production)에서 **VITE_API_URL**을 **Railway 백엔드 주소**로 설정 (예: `https://goodpocket-production.up.railway.app`, 끝에 `/` 없이). 저장 후 **Deployments** 탭에서 **Retry deployment** 또는 새 배포를 실행해 **다시 빌드**해야 적용됩니다.
+
+### OAuth 로그인 후 localhost로 리다이렉트됨 (프로덕션에서 "사이트에 연결할 수 없음")
+
+- **증상:** Cloudflare에 배포한 사이트에서 Google 로그인 후 `localhost:3000`(또는 localhost:5173)으로 이동해 "연결을 거부했습니다"가 뜸.
+- **원인:** Supabase **Site URL**이 로컬 주소(`http://localhost:3000` 등)로 되어 있어, OAuth 완료 후 Supabase가 그 주소로 보내버림.
+- **해결:** Supabase Dashboard > **Authentication** > **URL Configuration**에서 **Site URL**을 프로덕션 주소로 변경 (예: `https://goodpocket.pages.dev`). **Redirect URLs**에는 프로덕션 URL과 로컬 URL을 모두 넣어 두면 로컬/프로덕션 둘 다 사용 가능합니다.
+
 ### CORS 에러
 
 Backend `backend/app/main.py`의 `allow_origins`에 사용 중인 Frontend 도메인을 추가합니다. Cloudflare Pages 배포별 URL(`https://xxxxx.goodpocket.pages.dev`)은 `allow_origin_regex`로 이미 허용되어 있으므로, **커스텀 도메인**을 쓰는 경우에만 해당 도메인을 `allow_origins`에 추가하면 됩니다.
@@ -248,6 +262,28 @@ Backend `backend/app/main.py`의 `allow_origins`에 사용 중인 Frontend 도�
 
 - **원인:** Railway는 **아웃바운드 IPv6를 지원하지 않습니다**. Supabase Direct 연결은 기본적으로 IPv6로 연결을 시도하는데, Railway 네트워크에서는 해당 경로가 없어 "Network is unreachable"이 발생합니다. 로컬 PC는 IPv6 또는 이중 스택이라 잘 되고, Railway만 실패하는 이유입니다.
 - **해결:** 백엔드 `app/database.py`에서 DB 연결 전에 호스트명을 **IPv4로만** DNS 조회해 DSN의 호스트를 IPv4 주소로 바꾸도록 되어 있습니다. 최신 코드로 배포하면 Railway에서도 Supabase에 연결됩니다. (Supabase 프로젝트가 Paused 상태면 복구 후 재배포하세요.)
+
+### Railway 푸시 후 자동 빌드가 안 될 때
+
+Git push는 했는데 Railway에서 새 배포가 안 뜨는 경우, 아래를 순서대로 확인하세요.
+
+1. **소스 연결**
+   - Railway **프로젝트** → 해당 **서비스** 클릭 → **Settings** 탭
+   - **Source** 섹션에 GitHub 저장소가 연결되어 있는지 확인 (예: `gp2k/goodpocket`). 연결이 없으면 **Connect Repo**로 저장소를 선택해 연결합니다.
+
+2. **배포 브랜치**
+   - 같은 **Settings** 또는 **Source**에서 **Branch**가 `main`(또는 푸시한 브랜치)으로 되어 있는지 확인합니다. 다른 브랜치를 보고 있으면 해당 브랜치로만 푸시할 때 배포됩니다.
+
+3. **자동 배포 설정**
+   - **Settings**에 **Deploy on push**, **Auto Deploy**, **Watch Paths** 같은 옵션이 있으면, “푸시 시 자동 배포”가 켜져 있는지 확인합니다. 꺼져 있으면 수동으로 **Deploy** 버튼을 눌러야 합니다.
+
+4. **수동 배포로 한 번 돌리기**
+   - 서비스 화면에서 **Deployments** 탭 → **Deploy** 또는 **Redeploy** 버튼으로 최신 커밋을 골라 배포해 봅니다. 이렇게 하면 “자동은 안 되지만 수동은 된다” 상태인지 구분할 수 있습니다.
+
+5. **GitHub 연동 상태**
+   - GitHub 저장소 **Settings** → **Integrations** 또는 **Webhooks**에서 Railway 연동/웹훅이 있고, 최근 푸시에 대한 전송이 성공했는지 확인합니다. 실패가 반복되면 Railway 대시보드에서 연결을 끊었다가 다시 연결해 보세요.
+
+위를 확인해도 자동 빌드가 안 되면, 당분간은 푸시 후 Railway에서 **Deploy** 버튼으로 수동 배포하는 방식으로 진행하면 됩니다.
 
 ### Railway PORT
 
