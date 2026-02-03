@@ -5,6 +5,8 @@ Provides connection pooling and query helpers.
 import asyncio
 import ipaddress
 import re
+import socket
+from urllib.parse import urlparse, urlunparse
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator, Any, Optional
 import asyncpg
@@ -17,6 +19,55 @@ logger = structlog.get_logger()
 
 # Global connection pool
 _pool: Optional[asyncpg.Pool] = None
+
+
+def _resolve_host_to_ipv4_sync(host: str, port: int) -> str:
+    """Resolve hostname to IPv4. Returns host unchanged if already IPv4 or resolution fails."""
+    if not host:
+        return host
+    try:
+        ipaddress.IPv4Address(host)
+        return host  # already IPv4
+    except ValueError:
+        pass
+    try:
+        infos = socket.getaddrinfo(host, port, socket.AF_INET, socket.SOCK_STREAM)
+        if infos:
+            return infos[0][4][0]
+    except (socket.gaierror, OSError):
+        pass
+    return host
+
+
+def _dsn_use_ipv4_host(dsn: str) -> str:
+    """
+    Replace hostname in DSN with its IPv4 address.
+    Railway does not support outbound IPv6; Supabase direct connection often uses IPv6,
+    causing OSError [Errno 101] Network is unreachable. Forcing IPv4 fixes this.
+    """
+    parsed = urlparse(dsn)
+    host = parsed.hostname
+    port = parsed.port or 5432
+    if not host:
+        return dsn
+    ipv4 = _resolve_host_to_ipv4_sync(host, port)
+    if ipv4 == host:
+        return dsn
+    # Rebuild netloc without re-encoding userinfo (password may contain : or @)
+    netloc = parsed.netloc
+    at = netloc.rfind("@")
+    if at >= 0:
+        userinfo = netloc[: at + 1]
+        hostport = netloc[at + 1 :]
+    else:
+        userinfo = ""
+        hostport = netloc
+    if ":" in hostport:
+        _, _, port_str = hostport.rpartition(":")
+        new_netloc = f"{userinfo}{ipv4}:{port_str}"
+    else:
+        new_netloc = f"{userinfo}{ipv4}"
+    return urlunparse((parsed.scheme, new_netloc, parsed.path or "", parsed.params, parsed.query, parsed.fragment))
 
 
 def _normalize_database_url(url: str) -> str:
@@ -44,10 +95,14 @@ async def init_db() -> None:
     """Initialize database connection pool."""
     global _pool
     settings = get_settings()
-    
+
     logger.info("Initializing database connection pool")
-    
+
     dsn = _normalize_database_url(settings.database_url)
+    # Railway 등 IPv6 아웃바운드가 없는 환경에서 Supabase 연결 시 Network unreachable 방지
+    loop = asyncio.get_event_loop()
+    dsn = await loop.run_in_executor(None, _dsn_use_ipv4_host, dsn)
+
     _pool = await asyncpg.create_pool(
         dsn=dsn,
         min_size=2,

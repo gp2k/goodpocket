@@ -244,6 +244,11 @@ Backend `backend/app/main.py`의 `allow_origins`에 사용 중인 Frontend 도�
 - **원인:** `DATABASE_URL`에 호스트가 대괄호로 감싸여 있는 경우(예: `postgresql://...@[db.xxx.supabase.co]:5432/...`) Python의 URL 파서가 이를 IPv6으로 간주해 검사하다 도메인 이름에서 실패합니다.
 - **해결:** 백엔드 코드에서 DSN을 넘기기 전에 호스트명의 대괄호를 제거하는 정규화를 적용해 두었습니다. 최신 코드로 배포하면 해결됩니다. Railway에서 `DATABASE_URL`을 대괄호 없이 `...@db.xxx.supabase.co:5432/...` 형태로 넣어도 동작합니다.
 
+### Railway 크래시: `OSError: [Errno 101] Network is unreachable` (로컬에서는 Supabase 연결됨)
+
+- **원인:** Railway는 **아웃바운드 IPv6를 지원하지 않습니다**. Supabase Direct 연결은 기본적으로 IPv6로 연결을 시도하는데, Railway 네트워크에서는 해당 경로가 없어 "Network is unreachable"이 발생합니다. 로컬 PC는 IPv6 또는 이중 스택이라 잘 되고, Railway만 실패하는 이유입니다.
+- **해결:** 백엔드 `app/database.py`에서 DB 연결 전에 호스트명을 **IPv4로만** DNS 조회해 DSN의 호스트를 IPv4 주소로 바꾸도록 되어 있습니다. 최신 코드로 배포하면 Railway에서도 Supabase에 연결됩니다. (Supabase 프로젝트가 Paused 상태면 복구 후 재배포하세요.)
+
 ### Railway PORT
 
 Railway는 `PORT` 환경변수를 제공합니다. `Procfile`·`nixpacks.toml`에서 `$PORT`를 사용하므로 별도 설정 없이 동작합니다.
