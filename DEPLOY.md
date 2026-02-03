@@ -111,6 +111,56 @@ Railway URL을 확인한 뒤 `frontend/.env.production`의 `VITE_API_URL`을 실
 
 ---
 
+## 4단계: Cloudflare Pages용 Google OAuth 설정
+
+프로덕션(Cloudflare Pages)에서 "Google로 계속하기"가 동작하려면 **Google Cloud Console**에서 OAuth 클라이언트를 만들고, **Supabase**에 등록해야 합니다.
+
+### 4.1 Google Cloud Console에서 OAuth 클라이언트 만들기
+
+1. [Google Cloud Console](https://console.cloud.google.com/) 접속 후 로그인
+2. 상단 프로젝트 선택 → **새 프로젝트** 생성(또는 기존 프로젝트 선택)
+3. **APIs & Services** > **OAuth consent screen**
+   - User Type: **External** 선택 후 **Create**
+   - App name: `GoodPocket` (또는 원하는 이름)
+   - User support email, Developer contact email 입력 후 **Save and Continue**
+   - Scopes: **Add or remove scopes** → `.../auth/userinfo.email`, `.../auth/userinfo.profile` 추가 후 **Save and Continue**
+   - Test users: 로그인 허용할 Gmail 주소 추가(앱이 "Testing" 상태일 때) 후 **Save and Continue**
+4. **APIs & Services** > **Credentials** > **+ Create Credentials** > **OAuth client ID**
+   - Application type: **Web application**
+   - Name: `GoodPocket Web` (또는 원하는 이름)
+   - **Authorized redirect URIs**에서 **+ ADD URI** 클릭 후 아래 주소 **그대로** 입력:
+     ```
+     https://dzcxxilkzqjulokoxind.supabase.co/auth/v1/callback
+     ```
+     (Supabase 프로젝트가 다르면 Dashboard > Project Settings > API에서 URL 확인 후 `https://<프로젝트-ref>.supabase.co/auth/v1/callback` 로 넣기)
+   - **Create** 클릭
+5. 생성된 **Client ID**와 **Client secret**을 복사해 둡니다(나중에 Supabase에 붙여넣기).
+
+### 4.2 Supabase에 Google Provider 설정
+
+1. **Supabase Dashboard** > **Authentication** > **Providers**
+2. **Google** 행에서 **Enable** 토글 켜기
+3. **Client ID (for OAuth)**: Google에서 복사한 Client ID 붙여넣기
+4. **Client Secret (for OAuth)**: Google에서 복사한 Client secret 붙여넣기
+5. **Save** 클릭
+
+### 4.3 확인 사항
+
+- **3단계**에서 **Site URL**과 **Redirect URLs**에 Cloudflare Pages 주소(`https://goodpocket.pages.dev` 등)가 들어가 있어야 로그인 후 다시 사이트로 돌아옵니다.
+- 로컬에서 테스트할 때는 **Redirect URLs**에 `http://localhost:5173/`, `http://localhost:5173/**` 도 추가해 두면 됩니다.
+- Google OAuth consent screen이 **Testing** 상태면, **Test users**에 추가한 Gmail만 로그인 가능합니다. 모두에게 열려 있게 하려면 **Publish app**으로 승인 요청을 제출해야 합니다.
+
+### (참고) GitHub OAuth
+
+GitHub으로 로그인도 쓰는 경우:
+
+1. [GitHub Developer Settings](https://github.com/settings/developers) > **OAuth Apps** > **New OAuth App**
+2. **Authorization callback URL**: `https://dzcxxilkzqjulokoxind.supabase.co/auth/v1/callback` (Supabase 프로젝트에 맞게 수정)
+3. **Generate a new client secret** 후 Client ID / Secret 복사
+4. Supabase Dashboard > **Authentication** > **Providers** > **GitHub** 에서 Enable 후 ID/Secret 입력 후 Save
+
+---
+
 ## 배포 후 체크리스트
 
 - [ ] Railway: Backend Health check (`https://<railway-url>/health`) 응답 확인
@@ -118,6 +168,52 @@ Railway URL을 확인한 뒤 `frontend/.env.production`의 `VITE_API_URL`을 실
 - [ ] 로그인: OAuth(Google/GitHub) 및 이메일 로그인 테스트
 - [ ] API: 북마크 저장/목록 API 호출 테스트
 - [ ] CORS: 브라우저 콘솔에 CORS 에러 없는지 확인
+
+---
+
+## 로컬에서는 되는데 클라우드에서 안 될 때
+
+로컬에서는 로그인·북마크가 잘 되는데, Cloudflare Pages / Railway 배포 환경에서만 안 된다면 아래를 순서대로 확인하세요.
+
+### 1. 프론트엔드 환경 변수 (Cloudflare Pages)
+
+빌드 시점에 `VITE_*` 값이 들어가야 합니다. **Settings > Environment variables**에서 **Production**에 다음이 있는지 확인하세요.
+
+| 변수 | 확인 |
+|------|------|
+| `VITE_SUPABASE_URL` | Supabase 프로젝트 URL (예: `https://xxx.supabase.co`) |
+| `VITE_SUPABASE_ANON_KEY` | Supabase anon key |
+| `VITE_API_URL` | **Railway 백엔드 URL** (예: `https://xxx.up.railway.app`). **반드시 https로 끝나야 하며, 끝에 `/` 없이** |
+
+`VITE_API_URL`이 비어 있거나 `http://localhost:8000`이면 프로덕션에서 API 요청이 실패합니다. 값 수정 후 **다시 빌드(재배포)** 해야 반영됩니다.
+
+### 2. Supabase URL 설정
+
+**Supabase Dashboard > Authentication > URL Configuration**에서:
+
+- **Site URL**: 프로덕션 주소 (예: `https://goodpocket.pages.dev`)
+- **Redirect URLs**에 다음이 포함되어 있는지:
+  - `https://goodpocket.pages.dev/`
+  - `https://goodpocket.pages.dev/**`
+  - 배포별 URL을 쓴다면 `https://xxxxx.goodpocket.pages.dev/` 도 추가
+
+이게 잘못되면 로그인 후 리다이렉트가 실패하거나 세션이 유지되지 않을 수 있습니다.
+
+### 3. Railway 백엔드가 떠 있는지
+
+- Railway 서비스가 **크래시 루프**에 빠져 있으면 API 호출이 502/연결 실패로 끝납니다.
+- Dashboard에서 **Deployments** 상태가 성공(녹색)인지, **Logs**에 `Application startup complete` 같은 메시지가 나오는지 확인하세요.
+- Supabase 프로젝트가 **Paused** 상태면 백엔드가 DB에 연결하지 못해 기동에 실패할 수 있습니다. Supabase에서 **Restore project** 후 다시 확인하세요.
+
+### 4. CORS
+
+- 백엔드 `main.py`에서 `https://goodpocket.pages.dev`와 `*.goodpocket.pages.dev`(배포별 URL)가 허용되어 있습니다.
+- 브라우저 **개발자 도구 > Console**에 CORS 관련 에러가 있는지 확인하세요. 다른 도메인을 쓰면 **문제 해결 > CORS 에러**처럼 백엔드 `allow_origins` / `allow_origin_regex`에 해당 도메인을 추가해야 합니다.
+
+### 5. 브라우저에서 직접 확인
+
+- **F12 > Network**: 로그인 버튼 클릭 시 `/auth/v1/...`(Supabase), `/api/...`(Railway) 요청이 나가는지, 상태 코드가 200/302인지 확인.
+- **Console**: `Failed to fetch`, `CORS`, `401`, `502` 등 에러 메시지가 있으면 그 내용을 기준으로 위 1~4를 다시 점검하면 됩니다.
 
 ---
 
@@ -131,7 +227,7 @@ Railway URL을 확인한 뒤 `frontend/.env.production`의 `VITE_API_URL`을 실
 
 ### CORS 에러
 
-Backend `backend/app/main.py`의 `allow_origins`에 사용 중인 Frontend 도메인을 추가합니다.
+Backend `backend/app/main.py`의 `allow_origins`에 사용 중인 Frontend 도메인을 추가합니다. Cloudflare Pages 배포별 URL(`https://xxxxx.goodpocket.pages.dev`)은 `allow_origin_regex`로 이미 허용되어 있으므로, **커스텀 도메인**을 쓰는 경우에만 해당 도메인을 `allow_origins`에 추가하면 됩니다.
 
 ### Railway "Build timed out" / "importing to docker" 후 실패
 

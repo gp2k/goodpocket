@@ -60,14 +60,15 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
     
-    # CORS middleware
+    # CORS middleware: 로컬 + Cloudflare Pages(메인/배포별 URL 모두)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=[
             "http://localhost:5173",  # Vite dev server
             "http://localhost:3000",
-            "https://goodpocket.pages.dev",  # Cloudflare Pages
+            "https://goodpocket.pages.dev",
         ],
+        allow_origin_regex=r"^https://[a-z0-9-]+\.goodpocket\.pages\.dev$",  # 배포별 URL (예: 758885a7.goodpocket.pages.dev)
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],

@@ -26,15 +26,18 @@ def _normalize_database_url(url: str) -> str:
     sometimes provide DATABASE_URL with bracketed hostname (e.g. @[db.xxx.supabase.co]:5432),
     which causes ValueError. We strip brackets for hostnames so asyncpg/urllib accept the DSN.
     """
-    match = re.search(r"@\[([^\]]+)\](?=:\d+|/|$)", url)
-    if not match:
-        return url
-    host = match.group(1)
-    try:
-        ipaddress.ip_address(host)
-        return url  # valid IPv4/IPv6, keep as-is (brackets required for IPv6 in URLs)
-    except ValueError:
-        return url.replace(f"@[{host}]", f"@{host}", 1)
+    # Handle percent-encoded brackets (e.g. from some env sources)
+    url = url.replace("%5B", "[").replace("%5D", "]")
+
+    def _strip_brackets(m: re.Match[str]) -> str:
+        host = m.group(1)
+        try:
+            ipaddress.ip_address(host)
+            return m.group(0)  # valid IPv4/IPv6, keep brackets
+        except ValueError:
+            return "@" + host  # hostname: remove brackets
+
+    return re.sub(r"@\[([^\]]+)\]", _strip_brackets, url)
 
 
 async def init_db() -> None:
