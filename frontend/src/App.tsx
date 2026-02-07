@@ -4,7 +4,6 @@ import Layout from './components/Layout'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import Clusters from './pages/Clusters'
-import DensityClusters from './pages/DensityClusters'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, loading } = useAuth()
@@ -39,8 +38,6 @@ function App() {
         <Route index element={<Dashboard />} />
         <Route path="clusters" element={<Clusters />} />
         <Route path="clusters/:clusterId" element={<Clusters />} />
-        <Route path="density-clusters" element={<DensityClusters />} />
-        <Route path="density-clusters/:clusterId" element={<DensityClusters />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

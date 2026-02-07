@@ -6,7 +6,7 @@
 
 | 파일 | 적용 범위 | 내용 |
 |------|------------|------|
-| goodpocket-project.mdc | 항상 | 스택, 배포, 클러스터=dup_groups, 무의미한 "Cluster N" 금지, 문서 링크 |
+| goodpocket-project.mdc | 항상 | 스택, 배포, 클러스터=밀도 기반(clusters 테이블), 무의미한 "Cluster N" 금지, 문서 링크 |
 | backend-python.mdc | backend/**/*.py | venv, 클러스터/라벨/태그 컨벤션, DB/마이그레이션 |
 | frontend-react.mdc | frontend/**/*.ts, tsx | clustersApi.list(limit), cluster_label 표시, 스택 |
 
@@ -64,6 +64,6 @@ pytest -v
 
 - [README.md](../README.md) — 프로젝트 소개, 로컬 설정, API 요약
 - [DEPLOY.md](../DEPLOY.md) — 배포(Railway, Cloudflare), 환경 변수, 트러블슈팅
-- [docs/ARCHITECTURE.md](ARCHITECTURE.md) — 데이터 모델, 클러스터(dup_groups), topics, 마이그레이션
+- [docs/ARCHITECTURE.md](ARCHITECTURE.md) — 데이터 모델, 클러스터(밀도 기반), 마이그레이션
 - [docs/CLUSTER_COMPLEXITY_DIAGNOSIS.md](CLUSTER_COMPLEXITY_DIAGNOSIS.md) — 클러스터 복잡도 원인 및 개선 방향
 - [docs/DEVELOPMENT.md](DEVELOPMENT.md) — 이 문서 (규칙, 실행, 테스트, 배포, 마이그레이션)

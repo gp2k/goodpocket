@@ -304,7 +304,9 @@ Railway는 `PORT` 환경변수를 제공합니다. `Procfile`·`nixpacks.toml`�
 
 ## DB 마이그레이션 및 기존 북마크 → 새 클러스터링 마이그레이션
 
-새 클러스터링 방식(dup_groups, topics, simhash, 정규화 tags)을 쓰려면 아래 순서로 진행합니다.
+앱의 **클러스터 탭**은 밀도 기반(**clusters** 테이블, HDBSCAN)만 사용합니다. dup_groups/topics는 마이그레이션·백필용 데이터로만 채워지며 UI에는 노출되지 않습니다.
+
+새 클러스터링 방식(dup_groups, topics, simhash, 정규화 tags) 데이터를 백필하려면 아래 순서로 진행합니다.
 
 1. **003 스키마 적용**  
    Supabase SQL Editor에서 `infra/migrations/001_initial_schema.sql`, `002_add_bookmark_fields.sql` 다음으로 `infra/migrations/003_dup_groups_topics_embeddings.sql`을 실행합니다.

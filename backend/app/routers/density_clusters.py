@@ -1,5 +1,5 @@
 """
-Density (HDBSCAN) cluster API endpoints.
+Cluster API endpoints (density-based HDBSCAN).
 Reads from clusters table + bookmarks.cluster_id (populated by batch job).
 """
 from typing import Annotated
@@ -22,11 +22,11 @@ router = APIRouter()
 
 
 @router.get(
-    "/density-clusters",
+    "/clusters",
     response_model=DensityClusterListResponse,
-    summary="List user density (HDBSCAN) clusters",
+    summary="List user clusters",
 )
-async def list_density_clusters(
+async def list_clusters(
     user: Annotated[CurrentUser, Depends(get_current_user)],
     limit: Annotated[int, Query(ge=1, le=100, description="Max clusters to return")] = 40,
     min_size: Annotated[int, Query(ge=1, description="Minimum group size")] = 1,
@@ -59,11 +59,11 @@ async def list_density_clusters(
 
 
 @router.get(
-    "/density-clusters/{cluster_pk}",
+    "/clusters/{cluster_pk}",
     response_model=DensityClusterDetail,
-    summary="Get density cluster details with bookmarks",
+    summary="Get cluster details with bookmarks",
 )
-async def get_density_cluster(
+async def get_cluster(
     cluster_pk: int,
     user: Annotated[CurrentUser, Depends(get_current_user)],
 ):

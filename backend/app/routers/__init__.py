@@ -1,4 +1,4 @@
 """API routers."""
-from app.routers import bookmarks, clusters, density_clusters, jobs, topics
+from app.routers import bookmarks, density_clusters, jobs
 
-__all__ = ["bookmarks", "clusters", "density_clusters", "jobs", "topics"]
+__all__ = ["bookmarks", "density_clusters", "jobs"]

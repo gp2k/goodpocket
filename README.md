@@ -5,7 +5,7 @@ URL 북마크를 저장하고 자동으로 태그/클러스터링하는 웹 애�
 ## 주요 기능
 
 - URL 저장 시 자동 콘텐츠 추출 및 태그 생성
-- 머신러닝 기반 북마크 클러스터링 (HDBSCAN + UMAP)
+- 밀도 기반 북마크 클러스터링 (HDBSCAN + UMAP, 임베딩)
 - 한국어/영어 콘텐츠 지원
 - Supabase Auth 기반 사용자 인증
 
@@ -84,7 +84,7 @@ npm run dev
 4. Settings > API에서 URL, anon key, service role key 복사
 5. Settings > Auth에서 JWT Secret 복사
 
-기존 북마크를 새 클러스터링(dup_groups/topics) 방식으로 마이그레이션하려면 003 적용 후 `backend/scripts/migrate_to_dup_topics.py`를 실행하세요. 자세한 내용은 [DEPLOY.md](DEPLOY.md)의 "DB 마이그레이션 및 기존 북마크 → 새 클러스터링 마이그레이션" 절을 참고하세요.
+기존 북마크를 태그·dup_groups 등으로 백필하려면 003 적용 후 `backend/scripts/migrate_to_dup_topics.py`를 실행하세요. 자세한 내용은 [DEPLOY.md](DEPLOY.md)의 "DB 마이그레이션 및 기존 북마크 → 새 클러스터링 마이그레이션" 절을 참고하세요.
 
 ## 테스트 실행
 
@@ -175,7 +175,7 @@ VITE_API_URL=http://localhost:8000
 ## 추가 문서
 
 - **[DEPLOY.md](DEPLOY.md)** — Railway·Cloudflare Pages 배포, 환경 변수, 트러블슈팅
-- **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** — 데이터 모델(dup_groups, topics), 클러스터 API, 마이그레이션
+- **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** — 데이터 모델, 클러스터(밀도 기반) API, 마이그레이션
 - **[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)** — Cursor 규칙, 로컬 실행, 테스트, 배포, DB 마이그레이션
 - **[docs/CLUSTER_COMPLEXITY_DIAGNOSIS.md](docs/CLUSTER_COMPLEXITY_DIAGNOSIS.md)** — 클러스터 복잡도 원인 및 개선 방향
 - **[docs/FOR_CURSOR.md](docs/FOR_CURSOR.md)** — Cursor/AI 에이전트용 규칙·문서 요약
