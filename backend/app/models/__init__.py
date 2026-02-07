@@ -7,6 +7,7 @@ from app.models.schemas import (
     ClusterResponse,
     ClusterListResponse,
     ClusterDetail,
+    TopicTreeEntry,
     PaginationParams,
     MessageResponse,
 )
@@ -19,6 +20,7 @@ __all__ = [
     "ClusterResponse",
     "ClusterListResponse",
     "ClusterDetail",
+    "TopicTreeEntry",
     "PaginationParams",
     "MessageResponse",
 ]

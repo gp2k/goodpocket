@@ -34,14 +34,14 @@ def get_kiwi() -> Kiwi:
 YAKE_LANGUAGE = "en"
 YAKE_MAX_NGRAM = 1    # Single words only for cleaner tags
 YAKE_DEDUP_LIM = 0.9
-YAKE_TOP_N = 30
+YAKE_TOP_N = 45       # More candidates for shared categories (hierarchy)
 
-# Tag constraints
+# Tag constraints (higher counts for better category overlap across bookmarks)
 MIN_TAG_LENGTH_EN = 2
 MIN_TAG_LENGTH_KO = 1  # Korean single character nouns can be meaningful
 MAX_TAG_LENGTH = 24
-MAX_TAGS = 15
-MIN_TAGS = 5
+MAX_TAGS = 24
+MIN_TAGS = 8
 
 
 def detect_language(text: str) -> str:
@@ -154,7 +154,7 @@ def _is_valid_tag(tag: str) -> bool:
     return True
 
 
-def extract_korean_keywords(text: str, top_n: int = 30) -> List[str]:
+def extract_korean_keywords(text: str, top_n: int = 45) -> List[str]:
     """
     Extract keywords from Korean text using Kiwi morphological analyzer.
     

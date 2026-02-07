@@ -108,6 +108,20 @@ class ClusterDetail(BaseModel):
     bookmarks: list[BookmarkResponse]
 
 
+class TopicTreeEntry(BaseModel):
+    """Hierarchical topic node for tree view (tag-based categories)."""
+    id: UUID
+    label: str
+    children: list["TopicTreeEntry"] = Field(default_factory=list)
+    dup_group_count: int = 0
+    dup_group_ids: list[UUID] = Field(default_factory=list)
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+TopicTreeEntry.model_rebuild()
+
+
 class MessageResponse(BaseModel):
     """Simple message response."""
     message: str

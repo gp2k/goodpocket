@@ -26,7 +26,7 @@ URL 북마크를 저장하고 자동으로 태그/클러스터링하는 웹 애�
 
 ### Infrastructure
 - Database: Supabase (PostgreSQL + pgvector)
-- Backend: Google Cloud Run
+- Backend: Railway (권장) 또는 Google Cloud Run
 - Frontend: Cloudflare Pages
 
 ## 로컬 개발 환경 설정
@@ -149,7 +149,7 @@ Cloudflare Pages에서 환경 변수 설정:
 | GET | /api/bookmarks | 북마크 목록 조회 |
 | GET | /api/bookmarks/{id} | 북마크 상세 |
 | DELETE | /api/bookmarks/{id} | 북마크 삭제 |
-| GET | /api/clusters | 클러스터 목록 |
+| GET | /api/clusters | 클러스터 목록 (쿼리: limit, min_size) |
 | GET | /api/clusters/{id} | 클러스터 상세 |
 | POST | /api/jobs/batch | 배치 작업 트리거 |
 
@@ -171,6 +171,14 @@ VITE_SUPABASE_URL=https://xxx.supabase.co
 VITE_SUPABASE_ANON_KEY=xxx
 VITE_API_URL=http://localhost:8000
 ```
+
+## 추가 문서
+
+- **[DEPLOY.md](DEPLOY.md)** — Railway·Cloudflare Pages 배포, 환경 변수, 트러블슈팅
+- **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** — 데이터 모델(dup_groups, topics), 클러스터 API, 마이그레이션
+- **[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)** — Cursor 규칙, 로컬 실행, 테스트, 배포, DB 마이그레이션
+- **[docs/CLUSTER_COMPLEXITY_DIAGNOSIS.md](docs/CLUSTER_COMPLEXITY_DIAGNOSIS.md)** — 클러스터 복잡도 원인 및 개선 방향
+- **[docs/FOR_CURSOR.md](docs/FOR_CURSOR.md)** — Cursor/AI 에이전트용 규칙·문서 요약
 
 ## 라이선스
 

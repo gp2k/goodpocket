@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { clustersApi, Cluster, ClusterDetail as ClusterDetailType } from '../lib/api'
+import { clustersApi, topicsApi, Cluster, ClusterDetail as ClusterDetailType, TopicTreeEntry } from '../lib/api'
 import ClusterList from '../components/ClusterList'
 import ClusterDetail from '../components/ClusterDetail'
-import ClusterMindmap from '../components/ClusterMindmap'
+import TopicTreeMindmap from '../components/TopicTreeMindmap'
 
 type ViewMode = 'list' | 'mindmap'
 
@@ -12,19 +12,24 @@ export default function Clusters() {
   const navigate = useNavigate()
   
   const [clusters, setClusters] = useState<Cluster[]>([])
+  const [topicTree, setTopicTree] = useState<TopicTreeEntry | null>(null)
   const [selectedCluster, setSelectedCluster] = useState<ClusterDetailType | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<ViewMode>('mindmap')
 
-  // Load clusters list
+  // Load clusters list (for list view and cluster detail)
   useEffect(() => {
-    const loadClusters = async () => {
+    const load = async () => {
       try {
         setLoading(true)
         setError(null)
-        const response = await clustersApi.list({ limit: 30 })
-        setClusters(response.items)
+        const [clustersRes, treeRes] = await Promise.all([
+          clustersApi.list({ limit: 30 }),
+          topicsApi.getTree(),
+        ])
+        setClusters(clustersRes.items)
+        setTopicTree(treeRes)
       } catch (err) {
         setError(err instanceof Error ? err.message : '클러스터를 불러오는 중 오류가 발생했습니다')
       } finally {
@@ -32,7 +37,7 @@ export default function Clusters() {
       }
     }
 
-    loadClusters()
+    load()
   }, [])
 
   // Load selected cluster details
@@ -72,7 +77,7 @@ export default function Clusters() {
         </div>
         <div className="flex items-center space-x-2">
           {/* View Mode Toggle */}
-          {!selectedCluster && clusters.length > 0 && (
+          {!selectedCluster && (topicTree != null || clusters.length > 0) && (
             <div className="flex items-center bg-gray-100 rounded-lg p-1">
               <button
                 onClick={() => setViewMode('mindmap')}
@@ -133,12 +138,12 @@ export default function Clusters() {
       )}
 
       {/* Content */}
-      {!loading && !selectedCluster && clusters.length > 0 && (
-        viewMode === 'mindmap' ? (
-          <ClusterMindmap clusters={clusters} />
-        ) : (
+      {!loading && !selectedCluster && (
+        viewMode === 'mindmap' && topicTree ? (
+          <TopicTreeMindmap tree={topicTree} />
+        ) : clusters.length > 0 ? (
           <ClusterList clusters={clusters} onSelect={handleSelectCluster} />
-        )
+        ) : null
       )}
 
       {selectedCluster && (
@@ -146,7 +151,7 @@ export default function Clusters() {
       )}
 
       {/* Empty state */}
-      {!loading && clusters.length === 0 && (
+      {!loading && !selectedCluster && !topicTree?.children?.length && clusters.length === 0 && (
         <div className="text-center py-12">
           <div className="text-gray-400 text-5xl mb-4">📚</div>
           <h3 className="text-lg font-medium text-gray-900">클러스터가 없습니다</h3>

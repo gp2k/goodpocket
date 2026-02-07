@@ -91,6 +91,14 @@ export interface ClusterDetail {
   bookmarks: Bookmark[]
 }
 
+export interface TopicTreeEntry {
+  id: string
+  label: string
+  children: TopicTreeEntry[]
+  dup_group_count: number
+  dup_group_ids: string[]
+}
+
 // API functions
 export const bookmarksApi = {
   create: (url: string, title?: string) =>
@@ -125,6 +133,11 @@ export const clustersApi = {
 
   get: (id: string) =>
     api<ClusterDetail>(`/api/clusters/${id}`),
+}
+
+export const topicsApi = {
+  getTree: () =>
+    api<TopicTreeEntry>('/api/topics/tree'),
 }
 
 // Jobs API - for admin operations (use VITE_BATCH_SECRET in production)

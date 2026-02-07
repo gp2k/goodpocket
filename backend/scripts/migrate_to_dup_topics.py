@@ -11,6 +11,7 @@ import json
 import os
 import re
 import sys
+from collections import Counter
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -292,81 +293,145 @@ async def build_dup_groups_for_user(conn, user_id, dry_run: bool) -> int:
     return created
 
 
-async def build_topics_for_user(conn, user_id, dry_run: bool) -> int:
-    """Build topic tree: root -> domain topics; link dup_groups to domain topic."""
-    print("    [topics] Resolving root topic...", flush=True)
-    # Root topic per user
-    root = await conn.fetchrow(
-        "SELECT id FROM topics WHERE user_id = $1 AND parent_id IS NULL LIMIT 1",
-        user_id,
-    )
-    if not root:
-        if dry_run:
-            return 1
-        root_id = await conn.fetchval(
-            "INSERT INTO topics (user_id, parent_id, label, metrics_json) VALUES ($1, NULL, $2, $3) RETURNING id",
+async def build_topics_for_user(
+    conn, user_id, dry_run: bool, top_k: int = 20, cooccur_top_m: int = 10
+) -> int:
+    """Build topic tree: root -> Level1 (top tags) -> Level2 (co-occurring tags); link dup_groups to leaf topic."""
+    print("    [topics] Tag-based: resolving root...", flush=True)
+    # Clear existing topics and dup_group_topics for this user so we rebuild from scratch
+    if not dry_run:
+        await conn.execute(
+            "DELETE FROM dup_group_topics WHERE dup_group_id IN (SELECT id FROM dup_groups WHERE user_id = $1)",
             user_id,
-            "전체",
-            "{}",
         )
-    else:
-        root_id = root["id"]
+        await conn.execute("DELETE FROM topics WHERE user_id = $1", user_id)
 
-    # Get all dup_groups for user with representative bookmark's domain
-    print("    [topics] Fetching dup_groups with domain...", flush=True)
-    rows = await conn.fetch(
+    root_id = await conn.fetchval(
+        "INSERT INTO topics (user_id, parent_id, label, metrics_json) VALUES ($1, NULL, $2, $3) RETURNING id",
+        user_id,
+        "전체",
+        "{}",
+    ) if not dry_run else None
+    if dry_run:
+        return 1
+
+    # Level1: tag frequency across user's bookmarks -> top_k tags
+    print("    [topics] Level1: tag frequency...", flush=True)
+    tag_freq_rows = await conn.fetch(
         """
-        SELECT dg.id AS dup_group_id, b.domain
-        FROM dup_groups dg
-        JOIN bookmarks b ON b.id = dg.representative_bookmark_id
-        WHERE dg.user_id = $1 AND b.domain IS NOT NULL AND b.domain != ''
+        SELECT t.id AS tag_id, t.normalized_label AS label
+        FROM bookmark_tags bt
+        JOIN tags t ON t.id = bt.tag_id
+        JOIN bookmarks b ON b.id = bt.bookmark_id
+        WHERE b.user_id = $1
         """,
         user_id,
     )
-    print(f"    [topics] Fetched {len(rows)} dup_groups, creating topic links...", flush=True)
-    domain_to_topic: dict = {}
-    created_topics = 0
-    processed = 0
-    for r in rows:
-        domain = (r["domain"] or "").strip() or "unknown"
-        if domain not in domain_to_topic:
-            existing_topic = await conn.fetchrow(
-                "SELECT id FROM topics WHERE user_id = $1 AND parent_id = $2 AND label = $3",
-                user_id,
-                root_id,
-                domain,
-            )
-            if existing_topic:
-                domain_to_topic[domain] = existing_topic["id"]
-            else:
-                if dry_run:
-                    domain_to_topic[domain] = None
-                    created_topics += 1
-                    continue
-                topic_id = await conn.fetchval(
-                    "INSERT INTO topics (user_id, parent_id, label, metrics_json) VALUES ($1, $2, $3, $4) RETURNING id",
-                    user_id,
-                    root_id,
-                    domain,
-                    "{}",
-                )
-                domain_to_topic[domain] = topic_id
-                created_topics += 1
-        topic_id = domain_to_topic[domain]
-        if topic_id and not dry_run:
+    tag_counts: Counter = Counter()
+    for r in tag_freq_rows:
+        tag_counts[r["label"]] += 1
+    level1_labels = [label for label, _ in tag_counts.most_common(top_k)]
+    if not level1_labels:
+        print("    [topics] No tags for user, creating unknown leaf.", flush=True)
+        unknown_id = await conn.fetchval(
+            "INSERT INTO topics (user_id, parent_id, label, metrics_json) VALUES ($1, $2, $3, $4) RETURNING id",
+            user_id, root_id, "unknown", "{}",
+        )
+        dg_rows = await conn.fetch("SELECT id FROM dup_groups WHERE user_id = $1", user_id)
+        for r in dg_rows:
             await conn.execute(
-                """
-                INSERT INTO dup_group_topics (dup_group_id, topic_id)
-                VALUES ($1, $2)
-                ON CONFLICT (dup_group_id, topic_id) DO NOTHING
-                """,
-                r["dup_group_id"],
-                topic_id,
+                "INSERT INTO dup_group_topics (dup_group_id, topic_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+                r["id"], unknown_id,
             )
-        processed += 1
-        if processed % 500 == 0:
-            print(f"    [topics] Processed {processed}/{len(rows)} dup_groups...", flush=True)
-    return created_topics
+        return 1
+
+    label_to_topic_id: dict[str, str] = {}
+    for label in level1_labels:
+        tid = await conn.fetchval(
+            "INSERT INTO topics (user_id, parent_id, label, metrics_json) VALUES ($1, $2, $3, $4) RETURNING id",
+            user_id, root_id, label, "{}",
+        )
+        label_to_topic_id[label] = str(tid)
+
+    # Level2: for each Level1 tag, co-occurring tags in same bookmarks -> top cooccur_top_m
+    print("    [topics] Level2: co-occurring tags...", flush=True)
+    tag_freq_with_bid = await conn.fetch(
+        """
+        SELECT bt.bookmark_id, t.normalized_label AS label
+        FROM bookmark_tags bt
+        JOIN tags t ON t.id = bt.tag_id
+        JOIN bookmarks b ON b.id = bt.bookmark_id
+        WHERE b.user_id = $1
+        """,
+        user_id,
+    )
+    bookmark_to_labels: dict = {}
+    for r in tag_freq_with_bid:
+        bid = r["bookmark_id"]
+        bookmark_to_labels.setdefault(bid, set()).add(r["label"])
+
+    level2_to_parent: dict[str, str] = {}  # (parent_label, child_label) -> child_topic_id
+    for parent_label in level1_labels:
+        cooccur: Counter = Counter()
+        for labels in bookmark_to_labels.values():
+            if parent_label not in labels:
+                continue
+            for l in labels:
+                if l != parent_label:
+                    cooccur[l] += 1
+        for child_label, _ in cooccur.most_common(cooccur_top_m):
+            key = (parent_label, child_label)
+            if key in level2_to_parent:
+                continue
+            parent_tid = label_to_topic_id.get(parent_label)
+            if not parent_tid:
+                continue
+            child_tid = await conn.fetchval(
+                "INSERT INTO topics (user_id, parent_id, label, metrics_json) VALUES ($1, $2, $3, $4) RETURNING id",
+                user_id, parent_tid, child_label, "{}",
+            )
+            level2_to_parent[key] = str(child_tid)
+            label_to_topic_id[child_label] = str(child_tid)  # last parent wins for label lookup; we use leaf by path
+
+    def choose_leaf_topic_id_simple(tag_labels: set) -> str | None:
+        # Prefer deepest: Level2 if any (parent_label, child_label) both in tag_labels; else Level1
+        for parent_label in level1_labels:
+            if parent_label not in tag_labels:
+                continue
+            best = label_to_topic_id.get(parent_label)
+            for (p, c) in level2_to_parent:
+                if p == parent_label and c in tag_labels:
+                    best = level2_to_parent[(p, c)]
+                    break
+            if best:
+                return best
+        return label_to_topic_id.get(level1_labels[0]) if level1_labels else None
+
+    # dup_group -> topic: get tags of bookmarks in dup_group, assign to leaf topic
+    print("    [topics] Linking dup_groups to leaf topics...", flush=True)
+    dg_list = await conn.fetch(
+        "SELECT id FROM dup_groups WHERE user_id = $1",
+        user_id,
+    )
+    for dg_row in dg_list:
+        dg_id = dg_row["id"]
+        bm_ids = await conn.fetch(
+            "SELECT bookmark_id FROM bookmark_dup_map WHERE dup_group_id = $1",
+            dg_id,
+        )
+        labels_in_dg = set()
+        for b in bm_ids:
+            labels_in_dg |= bookmark_to_labels.get(b["bookmark_id"], set())
+        topic_id = choose_leaf_topic_id_simple(labels_in_dg)
+        if not topic_id:
+            topic_id = label_to_topic_id.get(level1_labels[0])
+        if topic_id:
+            await conn.execute(
+                "INSERT INTO dup_group_topics (dup_group_id, topic_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+                dg_id, topic_id,
+            )
+
+    return len(level1_labels) + len(level2_to_parent)
 
 
 async def run_migration(
