@@ -10,13 +10,17 @@
 반복 조회: while ($true) { python scripts/check_migration_progress.py; Start-Sleep -Seconds 30 }
 """
 import asyncio
+import json
 import os
 import sys
+import time
 from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app import database as db
+
+DEBUG_LOG = Path(__file__).resolve().parent.parent.parent / ".cursor" / "debug.log"
 
 
 async def main() -> None:
@@ -33,6 +37,40 @@ async def main() -> None:
             WHERE EXISTS (SELECT 1 FROM bookmark_tags bt WHERE bt.bookmark_id = b.id)
             """
         )
+        # #region agent log
+        empty_tags_col = await db.fetchval(
+            "SELECT COUNT(*) FROM bookmarks WHERE tags = '{}' OR tags IS NULL"
+        )
+        has_bt_no_tags_col = await db.fetchval(
+            """
+            SELECT COUNT(*) FROM bookmarks b
+            WHERE (b.tags = '{}' OR b.tags IS NULL)
+              AND EXISTS (SELECT 1 FROM bookmark_tags bt WHERE bt.bookmark_id = b.id)
+            """
+        )
+        try:
+            DEBUG_LOG.parent.mkdir(parents=True, exist_ok=True)
+            with open(DEBUG_LOG, "a", encoding="utf-8") as f:
+                f.write(
+                    json.dumps(
+                        {
+                            "hypothesisId": "H1",
+                            "runId": "diagnostic",
+                            "location": "check_migration_progress.py:main",
+                            "message": "bookmarks.tags vs bookmark_tags counts",
+                            "data": {
+                                "total_bookmarks": total,
+                                "empty_tags_column": empty_tags_col,
+                                "has_bookmark_tags_but_empty_tags_column": has_bt_no_tags_col,
+                            },
+                            "timestamp": int(time.time() * 1000),
+                        },
+                        ensure_ascii=False,
+                    ) + "\n"
+                )
+        except Exception:
+            pass
+        # #endregion
         # 미처리: simhash 없거나 bookmark_tags 없음
         pending = await db.fetchval(
             """

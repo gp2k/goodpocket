@@ -135,6 +135,19 @@ export const clustersApi = {
     api<ClusterDetail>(`/api/clusters/${id}`),
 }
 
+export const densityClustersApi = {
+  list: (params?: ClustersListParams) => {
+    const search = new URLSearchParams()
+    if (params?.limit != null) search.set('limit', String(params.limit))
+    if (params?.min_size != null) search.set('min_size', String(params.min_size))
+    const qs = search.toString()
+    return api<ClusterListResponse>(`/api/density-clusters${qs ? `?${qs}` : ''}`)
+  },
+
+  get: (id: string) =>
+    api<ClusterDetail>(`/api/density-clusters/${id}`),
+}
+
 export const topicsApi = {
   getTree: () =>
     api<TopicTreeEntry>('/api/topics/tree'),

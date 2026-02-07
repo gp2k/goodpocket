@@ -108,6 +108,30 @@ class ClusterDetail(BaseModel):
     bookmarks: list[BookmarkResponse]
 
 
+class DensityClusterResponse(BaseModel):
+    """Density (HDBSCAN) cluster summary; id is clusters.id (SERIAL) as string."""
+    id: str
+    label: Optional[str] = None
+    size: int
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class DensityClusterListResponse(BaseModel):
+    """List of density clusters for a user."""
+    items: list[DensityClusterResponse]
+    total: int
+
+
+class DensityClusterDetail(BaseModel):
+    """Density cluster with its bookmarks."""
+    id: str
+    label: Optional[str] = None
+    size: int
+    bookmarks: list[BookmarkResponse]
+
+
 class TopicTreeEntry(BaseModel):
     """Hierarchical topic node for tree view (tag-based categories)."""
     id: UUID

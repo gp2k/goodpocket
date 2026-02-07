@@ -11,7 +11,7 @@ import structlog
 
 from app.config import get_settings
 from app.database import init_db, close_db
-from app.routers import bookmarks, clusters, jobs, topics
+from app.routers import bookmarks, clusters, density_clusters, jobs, topics
 
 # Configure structured logging
 structlog.configure(
@@ -77,6 +77,7 @@ def create_app() -> FastAPI:
     # Include routers
     app.include_router(bookmarks.router, prefix="/api", tags=["bookmarks"])
     app.include_router(clusters.router, prefix="/api", tags=["clusters"])
+    app.include_router(density_clusters.router, prefix="/api", tags=["density-clusters"])
     app.include_router(topics.router, prefix="/api", tags=["topics"])
     app.include_router(jobs.router, prefix="/api", tags=["jobs"])
     

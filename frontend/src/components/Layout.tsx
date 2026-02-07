@@ -35,12 +35,22 @@ export default function Layout() {
               <Link
                 to="/clusters"
                 className={`px-3 py-2 rounded-md text-sm font-medium ${
-                  location.pathname.startsWith('/clusters')
+                  location.pathname.startsWith('/clusters') && !location.pathname.startsWith('/density-clusters')
                     ? 'bg-primary-100 text-primary-700'
                     : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
                 }`}
               >
                 클러스터
+              </Link>
+              <Link
+                to="/density-clusters"
+                className={`px-3 py-2 rounded-md text-sm font-medium ${
+                  location.pathname.startsWith('/density-clusters')
+                    ? 'bg-primary-100 text-primary-700'
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                }`}
+              >
+                밀도 기반 클러스터
               </Link>
             </nav>
 

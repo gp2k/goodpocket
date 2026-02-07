@@ -195,10 +195,25 @@ async def backfill_tags_for_chunk(conn, rows: list, dry_run: bool) -> int:
                     weight,
                 )
                 count += 1
+            # Keep legacy bookmarks.tags in sync so SELECT * FROM bookmarks WHERE tags = '{}' shrinks
+            await conn.execute(
+                "UPDATE bookmarks SET tags = $1 WHERE id = $2",
+                tag_labels,
+                bookmark_id,
+            )
         else:
             # 태그가 0개여도 "처리 완료"로 표시해 동일 북마크가 무한 재조회되지 않도록 함
             await _ensure_sentinel_tag_and_link(conn, user_id, bookmark_id)
 
+    # #region agent log
+    try:
+        _debug_log = __import__("pathlib").Path(__file__).resolve().parent.parent.parent / ".cursor" / "debug.log"
+        if _debug_log.parent.exists():
+            with open(_debug_log, "a", encoding="utf-8") as _f:
+                _f.write(__import__("json").dumps({"hypothesisId": "H1", "runId": "migration", "location": "migrate_to_dup_topics.py:backfill_tags_for_chunk", "message": "backfill writes only to bookmark_tags not bookmarks.tags", "data": {"chunk_size": len(rows)}, "timestamp": int(__import__("time").time() * 1000)}) + "\n")
+    except Exception:
+        pass
+    # #endregion
     return count
 
 
@@ -440,6 +455,30 @@ async def build_topics_for_user(
     return len(level1_labels) + len(level2_to_parent)
 
 
+async def sync_bookmarks_tags_from_bookmark_tags(conn, dry_run: bool) -> int:
+    """One-time sync: set bookmarks.tags from bookmark_tags for rows that have bookmark_tags but empty tags."""
+    if dry_run:
+        return 0
+    result = await conn.execute(
+        """
+        UPDATE bookmarks b
+        SET tags = (
+            SELECT COALESCE(array_agg(t.normalized_label ORDER BY bt.weight DESC NULLS LAST), '{}')
+            FROM bookmark_tags bt
+            JOIN tags t ON t.id = bt.tag_id
+            WHERE bt.bookmark_id = b.id
+        )
+        WHERE (b.tags = '{}' OR b.tags IS NULL)
+          AND EXISTS (SELECT 1 FROM bookmark_tags bt WHERE bt.bookmark_id = b.id)
+        """
+    )
+    # result is like "UPDATE N"
+    n = int(result.split()[-1]) if result and result.split() else 0
+    if n:
+        print(f"  [sync] Updated bookmarks.tags for {n} bookmarks from bookmark_tags.", flush=True)
+    return n
+
+
 async def run_migration(
     only_user_id: str | None = None,
     chunk_size: int = 500,
@@ -452,6 +491,11 @@ async def run_migration(
     last_completed_user_id = checkpoint.get("last_completed_user_id")
 
     async with pool.acquire() as conn:
+        # Sync legacy bookmarks.tags from bookmark_tags for already-migrated rows (fixes drift)
+        synced = await sync_bookmarks_tags_from_bookmark_tags(conn, dry_run)
+        if synced:
+            print(f"Synced bookmarks.tags for {synced} rows.", flush=True)
+
         users = await get_users_to_process(conn, only_user_id)
         if not users:
             print("No users to process.", flush=True)

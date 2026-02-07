@@ -82,7 +82,17 @@ async def create_bookmark(
         title=title or "",
         text=content.get("text", "")[:2000],
     )
-    
+    # #region agent log
+    try:
+        _log_path = __import__("pathlib").Path(__file__).resolve().parents[2] / ".cursor" / "debug.log"
+        if _log_path.parent.exists():
+            _text = content.get("text", "") or ""
+            with open(_log_path, "a", encoding="utf-8") as _f:
+                _f.write(__import__("json").dumps({"hypothesisId": "H2", "runId": "create_bookmark", "location": "bookmarks.py:create", "message": "generate_tags result at create", "data": {"tags_count": len(tags), "text_length": len(_text)}, "timestamp": int(__import__("time").time() * 1000)}) + "\n")
+    except Exception:
+        pass
+    # #endregion
+
     # Insert bookmark
     row = await db.fetchrow(
         """
