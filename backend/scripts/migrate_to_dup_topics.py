@@ -327,10 +327,14 @@ async def build_topics_for_user(
         """,
         user_id,
     )
+    SENTINEL_NO_TAGS = "__no_auto_tags__"
     tag_counts: Counter = Counter()
     for r in tag_freq_rows:
         tag_counts[r["label"]] += 1
-    level1_labels = [label for label, _ in tag_counts.most_common(top_k)]
+    level1_labels = [
+        label for label, _ in tag_counts.most_common(top_k + 10)
+        if label != SENTINEL_NO_TAGS
+    ][:top_k]
     if not level1_labels:
         print("    [topics] No tags for user, creating unknown leaf.", flush=True)
         unknown_id = await conn.fetchval(
@@ -380,6 +384,8 @@ async def build_topics_for_user(
                 if l != parent_label:
                     cooccur[l] += 1
         for child_label, _ in cooccur.most_common(cooccur_top_m):
+            if child_label == SENTINEL_NO_TAGS:
+                continue
             key = (parent_label, child_label)
             if key in level2_to_parent:
                 continue

@@ -11,7 +11,14 @@ const HEIGHT = 1000
 const CENTER_X = WIDTH / 2
 const CENTER_Y = HEIGHT / 2
 const R1 = 280
-const R2 = 160
+const R2 = 150
+
+const SENTINEL_LABEL = '__no_auto_tags__'
+
+function displayLabel(label: string): string {
+  if (label === SENTINEL_LABEL) return '태그 없음'
+  return label
+}
 
 interface NodeLayout {
   id: string
@@ -22,89 +29,65 @@ interface NodeLayout {
   dup_group_count: number
   dup_group_ids: string[]
   children: NodeLayout[]
+  totalCount: number // self + descendants for display
 }
 
-function layoutTree(root: TopicTreeEntry): NodeLayout[] {
-  const nodes: NodeLayout[] = []
-  const rootNode: NodeLayout = {
-    id: root.id,
-    label: root.label,
-    x: CENTER_X,
-    y: CENTER_Y,
-    level: 0,
-    dup_group_count: root.dup_group_count,
-    dup_group_ids: root.dup_group_ids || [],
-    children: [],
+function buildNodeLayout(
+  entry: TopicTreeEntry,
+  level: 0 | 1 | 2,
+  x: number,
+  y: number,
+): NodeLayout {
+  const children = (entry.children || []).map((c, j) => {
+    const angle = (2 * Math.PI * j) / Math.max(entry.children!.length, 1) - Math.PI / 2
+    return buildNodeLayout(
+      c,
+      2,
+      x + Math.cos(angle) * R2,
+      y + Math.sin(angle) * R2,
+    )
+  })
+  const totalCount = entry.dup_group_count + children.reduce((s, c) => s + c.totalCount, 0)
+  return {
+    id: entry.id,
+    label: entry.label,
+    x,
+    y,
+    level,
+    dup_group_count: entry.dup_group_count,
+    dup_group_ids: entry.dup_group_ids || [],
+    children,
+    totalCount,
   }
-  nodes.push(rootNode)
-
-  const level1 = root.children || []
-  level1.forEach((c1, i) => {
-    const angle1 = (2 * Math.PI * i) / Math.max(level1.length, 1) - Math.PI / 2
-    const child1: NodeLayout = {
-      id: c1.id,
-      label: c1.label,
-      x: CENTER_X + Math.cos(angle1) * R1,
-      y: CENTER_Y + Math.sin(angle1) * R1,
-      level: 1,
-      dup_group_count: c1.dup_group_count,
-      dup_group_ids: c1.dup_group_ids || [],
-      children: [],
-    }
-    nodes.push(child1)
-    const level2 = c1.children || []
-    level2.forEach((c2, j) => {
-      const angle2 = angle1 + (Math.PI * 0.6 * (j - (level2.length - 1) / 2)) / Math.max(level2.length, 1)
-      const child2: NodeLayout = {
-        id: c2.id,
-        label: c2.label,
-        x: child1.x + Math.cos(angle2) * R2,
-        y: child1.y + Math.sin(angle2) * R2,
-        level: 2,
-        dup_group_count: c2.dup_group_count,
-        dup_group_ids: c2.dup_group_ids || [],
-        children: [],
-      }
-      nodes.push(child2)
-    })
-  })
-
-  return nodes
 }
 
-function buildLinks(root: TopicTreeEntry): { x1: number; y1: number; x2: number; y2: number }[] {
-  const nodeMap = new Map<string, { x: number; y: number }>()
-  nodeMap.set(root.id, { x: CENTER_X, y: CENTER_Y })
+function layoutTreeCollapsed(root: TopicTreeEntry): { rootNode: NodeLayout; level1Nodes: NodeLayout[] } {
+  const rootNode = buildNodeLayout(root, 0, CENTER_X, CENTER_Y)
   const level1 = root.children || []
-  level1.forEach((c1, i) => {
+  const level1Nodes: NodeLayout[] = level1.map((c1, i) => {
     const angle1 = (2 * Math.PI * i) / Math.max(level1.length, 1) - Math.PI / 2
-    nodeMap.set(c1.id, {
-      x: CENTER_X + Math.cos(angle1) * R1,
-      y: CENTER_Y + Math.sin(angle1) * R1,
-    })
-    const level2 = c1.children || []
-    level2.forEach((c2, j) => {
-      const angle2 = angle1 + (Math.PI * 0.6 * (j - (level2.length - 1) / 2)) / Math.max(level2.length, 1)
-      const x1 = CENTER_X + Math.cos(angle1) * R1
-      const y1 = CENTER_Y + Math.sin(angle1) * R1
-      nodeMap.set(c2.id, {
-        x: x1 + Math.cos(angle2) * R2,
-        y: y1 + Math.sin(angle2) * R2,
-      })
-    })
+    return buildNodeLayout(
+      c1,
+      1,
+      CENTER_X + Math.cos(angle1) * R1,
+      CENTER_Y + Math.sin(angle1) * R1,
+    )
   })
+  return { rootNode, level1Nodes }
+}
 
+function buildLinksCollapsed(
+  level1Nodes: NodeLayout[],
+  expandedIds: Set<string>,
+): { x1: number; y1: number; x2: number; y2: number }[] {
   const links: { x1: number; y1: number; x2: number; y2: number }[] = []
-  level1.forEach((c1, i) => {
-    const angle1 = (2 * Math.PI * i) / Math.max(level1.length, 1) - Math.PI / 2
-    const p1 = { x: CENTER_X + Math.cos(angle1) * R1, y: CENTER_Y + Math.sin(angle1) * R1 }
-    links.push({ x1: CENTER_X, y1: CENTER_Y, x2: p1.x, y2: p1.y })
-    const level2 = c1.children || []
-    level2.forEach((_, j) => {
-      const angle2 = angle1 + (Math.PI * 0.6 * (j - (level2.length - 1) / 2)) / Math.max(level2.length, 1)
-      const p2 = { x: p1.x + Math.cos(angle2) * R2, y: p1.y + Math.sin(angle2) * R2 }
-      links.push({ x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y })
-    })
+  level1Nodes.forEach((n1) => {
+    links.push({ x1: CENTER_X, y1: CENTER_Y, x2: n1.x, y2: n1.y })
+    if (expandedIds.has(n1.id) && n1.children.length > 0) {
+      n1.children.forEach((n2) => {
+        links.push({ x1: n1.x, y1: n1.y, x2: n2.x, y2: n2.y })
+      })
+    }
   })
   return links
 }
@@ -115,10 +98,23 @@ export default function TopicTreeMindmap({ tree }: TopicTreeMindmapProps) {
   const [scale, setScale] = useState(0.85)
   const [pan, setPan] = useState({ x: 0, y: 0 })
   const [isPanning, setIsPanning] = useState(false)
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
   const lastMousePos = useRef({ x: 0, y: 0 })
 
-  const nodes = useMemo(() => layoutTree(tree), [tree])
-  const links = useMemo(() => buildLinks(tree), [tree])
+  const { rootNode, level1Nodes } = useMemo(() => layoutTreeCollapsed(tree), [tree])
+  const links = useMemo(
+    () => buildLinksCollapsed(level1Nodes, expandedIds),
+    [level1Nodes, expandedIds],
+  )
+
+  const toggleExpand = (id: string) => {
+    setExpandedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
 
   const handleWheel = (e: React.WheelEvent) => {
     e.preventDefault()
@@ -146,14 +142,22 @@ export default function TopicTreeMindmap({ tree }: TopicTreeMindmapProps) {
   const handleMouseUp = () => setIsPanning(false)
   const handleContextMenu = (e: React.MouseEvent) => e.preventDefault()
 
-  const handleNodeClick = (node: NodeLayout) => {
-    if (node.level > 0 && node.dup_group_ids.length > 0) {
-      navigate(`/clusters/${node.dup_group_ids[0]}`)
+  const handleNodeClick = (node: NodeLayout, isLevel1: boolean) => {
+    if (isLevel1) {
+      if (node.children.length > 0) {
+        toggleExpand(node.id)
+      } else if (node.dup_group_ids.length > 0) {
+        navigate(`/clusters/${node.dup_group_ids[0]}`)
+      }
+    } else {
+      if (node.dup_group_ids.length > 0) {
+        navigate(`/clusters/${node.dup_group_ids[0]}`)
+      }
     }
   }
 
-  const totalGroups = nodes.reduce((s, n) => s + n.dup_group_count, 0)
-  const hasHierarchy = (tree.children?.length ?? 0) > 0
+  const totalGroups = level1Nodes.reduce((s, n) => s + n.totalCount, 0)
+  const hasHierarchy = level1Nodes.length > 0
 
   if (!hasHierarchy) {
     return (
@@ -162,6 +166,13 @@ export default function TopicTreeMindmap({ tree }: TopicTreeMindmapProps) {
       </div>
     )
   }
+
+  const visibleLevel2Nodes: NodeLayout[] = []
+  level1Nodes.forEach((n1) => {
+    if (expandedIds.has(n1.id)) {
+      n1.children.forEach((n2) => visibleLevel2Nodes.push(n2))
+    }
+  })
 
   return (
     <div
@@ -177,7 +188,7 @@ export default function TopicTreeMindmap({ tree }: TopicTreeMindmapProps) {
     >
       <div className="absolute top-4 right-4 z-20 flex items-center gap-2">
         <span className="bg-white/90 backdrop-blur rounded-lg shadow px-3 py-1.5 text-xs text-gray-600">
-          휠: 줌 | 우클릭 드래그: 이동
+          휠: 줌 | 우클릭 드래그: 이동 | 클릭: 펼치기/이동
         </span>
         <button
           type="button"
@@ -223,36 +234,77 @@ export default function TopicTreeMindmap({ tree }: TopicTreeMindmapProps) {
           ))}
         </svg>
 
-        {nodes.map((node) => (
+        {/* Root */}
+        <div
+          className="absolute transform -translate-x-1/2 -translate-y-1/2"
+          style={{ left: rootNode.x, top: rootNode.y, zIndex: 10 }}
+        >
+          <div className="bg-gradient-to-br from-indigo-600 to-purple-600 text-white px-6 py-4 rounded-2xl shadow-xl font-semibold text-center">
+            <div>{displayLabel(rootNode.label)}</div>
+            <div className="text-indigo-200 text-sm mt-1">
+              {totalGroups}개 그룹 · {level1Nodes.length}개 카테고리
+            </div>
+          </div>
+        </div>
+
+        {/* Level1: 항상 표시, 접힌 상태로 개수만 표시 */}
+        {level1Nodes.map((node) => (
           <div
             key={node.id}
             className="absolute transform -translate-x-1/2 -translate-y-1/2"
-            style={{ left: node.x, top: node.y, zIndex: node.level === 0 ? 10 : 5 }}
+            style={{ left: node.x, top: node.y, zIndex: 5 }}
           >
-            {node.level === 0 ? (
-              <div className="bg-gradient-to-br from-indigo-600 to-purple-600 text-white px-6 py-4 rounded-2xl shadow-xl font-semibold text-center">
-                <div>{node.label}</div>
-                <div className="text-indigo-200 text-sm mt-1">
-                  {totalGroups}개 그룹 · {tree.children?.length ?? 0}개 카테고리
-                </div>
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={() => handleNodeClick(node)}
-                className={`text-center rounded-xl shadow-md border-2 px-4 py-2.5 transition-all ${
-                  node.dup_group_count > 0
-                    ? 'bg-emerald-50 border-emerald-300 hover:border-emerald-500 hover:shadow-lg cursor-pointer'
-                    : 'bg-gray-50 border-gray-200 cursor-default'
-                }`}
-                style={{ minWidth: '100px', maxWidth: '180px' }}
+            <button
+              type="button"
+              onClick={() => handleNodeClick(node, true)}
+              title={node.label}
+              className={`text-center rounded-xl shadow-md border-2 px-4 py-2.5 transition-all min-w-[120px] max-w-[200px] ${
+                node.totalCount > 0
+                  ? 'bg-emerald-50 border-emerald-300 hover:border-emerald-500 hover:shadow-lg cursor-pointer'
+                  : 'bg-gray-50 border-gray-200 cursor-default'
+              }`}
+            >
+              <div
+                className="font-semibold text-gray-900 text-sm break-words leading-tight"
+                style={{ wordBreak: 'break-word' }}
               >
-                <div className="font-semibold text-gray-900 text-sm truncate">{node.label}</div>
-                {node.dup_group_count > 0 && (
-                  <div className="text-xs text-emerald-700 mt-1">{node.dup_group_count}개 그룹</div>
-                )}
-              </button>
-            )}
+                {displayLabel(node.label)}
+              </div>
+              <div className="text-xs text-emerald-700 mt-1">
+                {node.totalCount > 0 ? `${node.totalCount}개` : '0개'}
+                {node.children.length > 0 && !expandedIds.has(node.id) && ' · 클릭하여 펼치기'}
+              </div>
+            </button>
+          </div>
+        ))}
+
+        {/* Level2: 펼쳐진 부모의 자식만 표시 */}
+        {visibleLevel2Nodes.map((node) => (
+          <div
+            key={node.id}
+            className="absolute transform -translate-x-1/2 -translate-y-1/2"
+            style={{ left: node.x, top: node.y, zIndex: 4 }}
+          >
+            <button
+              type="button"
+              onClick={() => handleNodeClick(node, false)}
+              title={node.label}
+              className={`text-center rounded-lg shadow border-2 px-3 py-2 transition-all min-w-[100px] max-w-[180px] ${
+                node.dup_group_count > 0
+                  ? 'bg-white border-emerald-200 hover:border-emerald-400 hover:shadow cursor-pointer'
+                  : 'bg-gray-50 border-gray-200 cursor-default'
+              }`}
+            >
+              <div
+                className="font-medium text-gray-800 text-xs break-words leading-tight"
+                style={{ wordBreak: 'break-word' }}
+              >
+                {displayLabel(node.label)}
+              </div>
+              {node.dup_group_count > 0 && (
+                <div className="text-xs text-emerald-600 mt-0.5">{node.dup_group_count}개 그룹</div>
+              )}
+            </button>
           </div>
         ))}
       </div>
