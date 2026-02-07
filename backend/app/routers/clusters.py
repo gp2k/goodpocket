@@ -4,7 +4,7 @@ Cluster API endpoints (dup_groups + bookmark_dup_map).
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 import structlog
 
 from app.auth import get_current_user, CurrentUser
@@ -28,18 +28,23 @@ router = APIRouter()
 )
 async def list_clusters(
     user: Annotated[CurrentUser, Depends(get_current_user)],
+    limit: Annotated[int, Query(ge=1, le=100, description="Max clusters to return")] = 40,
+    min_size: Annotated[int, Query(ge=1, description="Minimum group size")] = 1,
 ):
-    """Get all dup_groups (clusters) for the current user."""
+    """Get dup_groups (clusters) for the current user, optionally limited and filtered by size."""
     rows = await db.fetch(
         """
         SELECT dg.id, dg.size, dg.updated_at,
                COALESCE(NULLIF(TRIM(b.title), ''), b.domain, 'Untitled') AS label
         FROM dup_groups dg
         LEFT JOIN bookmarks b ON b.id = dg.representative_bookmark_id
-        WHERE dg.user_id = $1
+        WHERE dg.user_id = $1 AND dg.size >= $2
         ORDER BY dg.size DESC, dg.updated_at DESC NULLS LAST
+        LIMIT $3
         """,
         user.id,
+        min_size,
+        limit,
     )
 
     items = [

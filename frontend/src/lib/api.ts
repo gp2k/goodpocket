@@ -109,9 +109,19 @@ export const bookmarksApi = {
     api<{ message: string }>(`/api/bookmarks/${id}`, { method: 'DELETE' }),
 }
 
+export type ClustersListParams = {
+  limit?: number
+  min_size?: number
+}
+
 export const clustersApi = {
-  list: () =>
-    api<ClusterListResponse>('/api/clusters'),
+  list: (params?: ClustersListParams) => {
+    const search = new URLSearchParams()
+    if (params?.limit != null) search.set('limit', String(params.limit))
+    if (params?.min_size != null) search.set('min_size', String(params.min_size))
+    const qs = search.toString()
+    return api<ClusterListResponse>(`/api/clusters${qs ? `?${qs}` : ''}`)
+  },
 
   get: (id: string) =>
     api<ClusterDetail>(`/api/clusters/${id}`),

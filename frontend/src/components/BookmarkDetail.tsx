@@ -1,6 +1,13 @@
 import { useState } from 'react'
 import { Bookmark, bookmarksApi } from '../lib/api'
 
+/** Hide or normalize meaningless cluster labels like "Cluster 47". */
+function clusterLabelDisplay(label: string | null | undefined): string {
+  if (!label?.trim()) return ''
+  if (/^cluster\s*_?\s*\d+$/i.test(label.trim())) return '그룹'
+  return label
+}
+
 interface BookmarkDetailProps {
   bookmark: Bookmark
   onClose: () => void
@@ -112,11 +119,11 @@ export default function BookmarkDetail({
             )}
 
             {/* Cluster */}
-            {bookmark.cluster_label && (
+            {clusterLabelDisplay(bookmark.cluster_label) && (
               <div>
                 <h4 className="text-sm font-medium text-gray-500">클러스터</h4>
                 <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-primary-100 text-primary-700">
-                  📁 {bookmark.cluster_label}
+                  📁 {clusterLabelDisplay(bookmark.cluster_label)}
                 </span>
               </div>
             )}

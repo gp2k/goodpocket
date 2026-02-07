@@ -130,6 +130,10 @@ def _is_valid_tag(tag: str) -> bool:
     if not tag:
         return False
     
+    # Reject meaningless "Cluster N" style tags (cluster47, cluster_47, cluster 47)
+    if re.match(r"^cluster[_]?\s*\d+$", tag, re.IGNORECASE):
+        return False
+    
     # Check if it's a stopword
     if is_stopword(tag):
         return False

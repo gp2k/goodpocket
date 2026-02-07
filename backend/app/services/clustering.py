@@ -253,7 +253,7 @@ def generate_cluster_labels(
     
     for cluster_id, tags in cluster_tags.items():
         if not tags:
-            labels[cluster_id] = f"Cluster {cluster_id}"
+            labels[cluster_id] = ""  # No meaningless "Cluster N" label
             continue
         
         # Count tag frequencies

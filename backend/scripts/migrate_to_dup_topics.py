@@ -9,6 +9,7 @@ import argparse
 import asyncio
 import json
 import os
+import re
 import sys
 from pathlib import Path
 from urllib.parse import urlparse
@@ -45,6 +46,13 @@ def _summary_text(summary: str | None, excerpt: str | None) -> str:
     if not raw:
         return ""
     return raw[:SUMMARY_TEXT_MAX]
+
+
+def _is_meaningless_tag(label: str) -> bool:
+    """Filter out "Cluster N" style labels so they are not stored as tags."""
+    if not label or not str(label).strip():
+        return True
+    return bool(re.match(r"^cluster[_]?\s*\d+$", str(label).strip(), re.IGNORECASE))
 
 
 def load_checkpoint() -> dict:
@@ -144,6 +152,9 @@ async def backfill_tags_for_chunk(conn, rows: list, dry_run: bool) -> int:
                 tag_labels = generate_tags(title=title, text=summary_text[:5000])
         else:
             tag_labels = generate_tags(title=title, text=summary_text[:5000])
+
+        # Drop meaningless tags (e.g. "Cluster 47") before insert
+        tag_labels = [l for l in tag_labels if l and not _is_meaningless_tag(l)]
 
         if dry_run:
             count += len(tag_labels)

@@ -23,7 +23,7 @@ export default function Clusters() {
       try {
         setLoading(true)
         setError(null)
-        const response = await clustersApi.list()
+        const response = await clustersApi.list({ limit: 30 })
         setClusters(response.items)
       } catch (err) {
         setError(err instanceof Error ? err.message : '클러스터를 불러오는 중 오류가 발생했습니다')

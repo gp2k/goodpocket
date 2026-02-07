@@ -1,5 +1,12 @@
 import { Bookmark } from '../lib/api'
 
+/** Hide or normalize meaningless cluster labels like "Cluster 47". */
+function clusterLabelDisplay(label: string | null | undefined): string {
+  if (!label?.trim()) return ''
+  if (/^cluster\s*_?\s*\d+$/i.test(label.trim())) return '그룹'
+  return label
+}
+
 interface BookmarkListProps {
   bookmarks: Bookmark[]
   loading: boolean
@@ -113,10 +120,10 @@ export default function BookmarkList({
               )}
 
               {/* Cluster label */}
-              {bookmark.cluster_label && (
+              {clusterLabelDisplay(bookmark.cluster_label) && (
                 <div className="mt-2">
                   <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-primary-100 text-primary-700">
-                    📁 {bookmark.cluster_label}
+                    📁 {clusterLabelDisplay(bookmark.cluster_label)}
                   </span>
                 </div>
               )}
