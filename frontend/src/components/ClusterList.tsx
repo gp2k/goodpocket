@@ -19,13 +19,13 @@ export default function ClusterList({ clusters, onSelect }: ClusterListProps) {
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
       {clusters.map((cluster) => (
         <div
-          key={cluster.cluster_id}
+          key={cluster.id}
           onClick={() => onSelect(cluster)}
           className="bg-white rounded-lg shadow p-5 cursor-pointer hover:shadow-md transition-shadow"
         >
           {/* Cluster label */}
           <h3 className="text-base font-medium text-gray-900 mb-2">
-            {cluster.label || `Cluster ${cluster.cluster_id}`}
+            {cluster.label || `그룹 ${cluster.id.slice(0, 8)}`}
           </h3>
 
           {/* Stats */}

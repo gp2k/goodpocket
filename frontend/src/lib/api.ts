@@ -73,7 +73,7 @@ export interface BookmarkListResponse {
 }
 
 export interface Cluster {
-  cluster_id: number
+  id: string
   label?: string
   size: number
   updated_at: string
@@ -85,7 +85,7 @@ export interface ClusterListResponse {
 }
 
 export interface ClusterDetail {
-  cluster_id: number
+  id: string
   label?: string
   size: number
   bookmarks: Bookmark[]
@@ -113,8 +113,8 @@ export const clustersApi = {
   list: () =>
     api<ClusterListResponse>('/api/clusters'),
 
-  get: (clusterId: number) =>
-    api<ClusterDetail>(`/api/clusters/${clusterId}`),
+  get: (id: string) =>
+    api<ClusterDetail>(`/api/clusters/${id}`),
 }
 
 // Jobs API - for admin operations (use VITE_BATCH_SECRET in production)

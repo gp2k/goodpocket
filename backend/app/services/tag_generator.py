@@ -402,6 +402,6 @@ def generate_tags(
                 if len(tags) >= min_tags:
                     break
     
-    logger.info("Tags generated", count=len(tags), tags=tags[:10], language=language)
+    logger.info("Tags generated", count=len(tags), language=language)
     
     return tags

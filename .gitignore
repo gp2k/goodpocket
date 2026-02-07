@@ -69,3 +69,6 @@ htmlcov/
 # Temporary files
 *.tmp
 *.temp
+
+# Migration checkpoint (local/resumable state)
+backend/scripts/.migrate_dup_topics_checkpoint.json

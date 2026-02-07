@@ -93,6 +93,7 @@ Settings > Environment variables (Production)에서 추가:
 | `VITE_SUPABASE_URL` | `https://dzcxxilkzqjulokoxind.supabase.co` |
 | `VITE_SUPABASE_ANON_KEY` | Supabase anon key |
 | `VITE_API_URL` | Railway Backend URL (1단계에서 복사한 URL) |
+| `VITE_BATCH_SECRET` | Railway에 넣은 `BATCH_JOB_SECRET`과 **동일한 값** (클러스터링 실행 버튼용) |
 
 ### 2.3 .env.production 업데이트
 
@@ -228,6 +229,11 @@ GitHub으로 로그인도 쓰는 경우:
 - **해결:** Backend 서비스 **Settings** → **Root Directory**를 `backend`로 설정한 뒤 다시 배포.
 - 프로젝트를 지우고, **Empty project** → **Empty Service** 생성 → Root Directory `backend` 설정 → **Connect Repo** 순서로 다시 시도해도 됩니다.
 
+### "Invalid batch secret" (클러스터링 실행 시)
+
+- **원인:** 배치 API는 `X-Batch-Secret` 헤더로 시크릿을 검사합니다. Railway의 `BATCH_JOB_SECRET`과 Cloudflare Pages 빌드 시 넣은 `VITE_BATCH_SECRET`이 **같아야** 합니다. 프론트에 값이 없거나 다르면 이 오류가 납니다.
+- **해결:** (1) Railway **Variables**에 `BATCH_JOB_SECRET`이 있는지 확인 (없으면 예: `goodpocket-secret-batch-5814` 같은 값으로 추가). (2) Cloudflare Pages **Settings > Environment variables** (Production)에 `VITE_BATCH_SECRET`을 **같은 값**으로 추가. (3) **재배포** (Vite는 빌드 시점에 env를 넣으므로 변수 추가/수정 후 반드시 다시 배포).
+
 ### Cloudflare 배포판에서 "Unexpected token '<', \"<!DOCTYPE \"... is not valid JSON\" / 북마크 저장 실패
 
 - **원인:** Cloudflare Pages 빌드 시 **VITE_API_URL**이 비어 있거나 잘못됨. API 요청이 Railway가 아니라 같은 도메인(goodpocket.pages.dev)으로 가서, 존재하지 않는 경로에 대해 HTML(index.html 등)이 반환되고, 프론트가 이를 JSON으로 파싱하다 에러 발생.
@@ -293,3 +299,33 @@ Railway는 `PORT` 환경변수를 제공합니다. `Procfile`·`nixpacks.toml`�
 
 - Root directory가 `frontend`인지 확인
 - Node 버전: Cloudflare 기본 버전 사용. 필요 시 Build command에 `npx vite build` 등 명시
+
+---
+
+## DB 마이그레이션 및 기존 북마크 → 새 클러스터링 마이그레이션
+
+새 클러스터링 방식(dup_groups, topics, simhash, 정규화 tags)을 쓰려면 아래 순서로 진행합니다.
+
+1. **003 스키마 적용**  
+   Supabase SQL Editor에서 `infra/migrations/001_initial_schema.sql`, `002_add_bookmark_fields.sql` 다음으로 `infra/migrations/003_dup_groups_topics_embeddings.sql`을 실행합니다.
+
+2. **데이터 마이그레이션 스크립트 실행**  
+   기존 bookmarks를 새 형태로 백필하려면 백엔드 venv에서 다음을 실행합니다.
+
+   ```powershell
+   cd backend
+   .\.venv\Scripts\Activate.ps1
+   python scripts/migrate_to_dup_topics.py
+   ```
+
+   옵션: `--user-id UUID`(특정 사용자만), `--chunk-size 500`, `--dry-run`(실제 쓰기 없음), `--resume`(중단 지점부터 재개).  
+   스크립트는 북마크 컬럼(domain, simhash64, summary_text, lang 등) 백필, tags/bookmark_tags, dup_groups/bookmark_dup_map, topics/dup_group_topics를 순서대로 채웁니다. 재실행 시 멱등하게 동작합니다.
+
+   **실시간 로그 보기:** 터미널에서 직접 실행하면 로그가 실시간으로 출력됩니다. Cursor에서 **터미널** (Ctrl+`) 열고 아래를 실행하세요. (한글 로그 오류 방지를 위해 UTF-8 설정 권장.)
+
+   ```powershell
+   cd backend
+   $env:PYTHONIOENCODING = "utf-8"
+   .\.venv\Scripts\Activate.ps1
+   python scripts/migrate_to_dup_topics.py --resume
+   ```

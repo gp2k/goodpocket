@@ -1,7 +1,8 @@
 """
-Cluster API endpoints.
+Cluster API endpoints (dup_groups + bookmark_dup_map).
 """
 from typing import Annotated
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 import structlog
@@ -28,27 +29,29 @@ router = APIRouter()
 async def list_clusters(
     user: Annotated[CurrentUser, Depends(get_current_user)],
 ):
-    """Get all clusters for the current user."""
+    """Get all dup_groups (clusters) for the current user."""
     rows = await db.fetch(
         """
-        SELECT cluster_id, label, size, updated_at
-        FROM clusters
-        WHERE user_id = $1
-        ORDER BY size DESC
+        SELECT dg.id, dg.size, dg.updated_at,
+               COALESCE(NULLIF(TRIM(b.title), ''), b.domain, 'Untitled') AS label
+        FROM dup_groups dg
+        LEFT JOIN bookmarks b ON b.id = dg.representative_bookmark_id
+        WHERE dg.user_id = $1
+        ORDER BY dg.size DESC, dg.updated_at DESC NULLS LAST
         """,
-        user.id
+        user.id,
     )
-    
+
     items = [
         ClusterResponse(
-            cluster_id=row["cluster_id"],
-            label=row["label"],
+            id=row["id"],
+            label=row["label"] or "Untitled",
             size=row["size"],
             updated_at=row["updated_at"],
         )
         for row in rows
     ]
-    
+
     return ClusterListResponse(items=items, total=len(items))
 
 
@@ -58,38 +61,40 @@ async def list_clusters(
     summary="Get cluster details with bookmarks",
 )
 async def get_cluster(
-    cluster_id: int,
+    cluster_id: UUID,
     user: Annotated[CurrentUser, Depends(get_current_user)],
 ):
-    """Get a cluster with its bookmarks."""
-    # Get cluster info
+    """Get a dup_group (cluster) with its bookmarks."""
     cluster_row = await db.fetchrow(
         """
-        SELECT cluster_id, label, size
-        FROM clusters
-        WHERE user_id = $1 AND cluster_id = $2
+        SELECT dg.id, dg.size,
+               COALESCE(NULLIF(TRIM(b.title), ''), b.domain, 'Untitled') AS label
+        FROM dup_groups dg
+        LEFT JOIN bookmarks b ON b.id = dg.representative_bookmark_id
+        WHERE dg.user_id = $1 AND dg.id = $2
         """,
-        user.id, cluster_id
+        user.id,
+        cluster_id,
     )
-    
+
     if not cluster_row:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Cluster not found",
         )
-    
-    # Get bookmarks in this cluster
+
     bookmark_rows = await db.fetch(
         """
-        SELECT id, url, canonical_url, title, tags, status,
-               cluster_id, cluster_label, created_at
-        FROM bookmarks
-        WHERE user_id = $1 AND cluster_id = $2
-        ORDER BY created_at DESC
+        SELECT b.id, b.url, b.canonical_url, b.title, b.tags, b.status, b.created_at
+        FROM bookmark_dup_map bdm
+        JOIN bookmarks b ON b.id = bdm.bookmark_id
+        WHERE bdm.dup_group_id = $1 AND b.user_id = $2
+        ORDER BY b.created_at DESC
         """,
-        user.id, cluster_id
+        cluster_id,
+        user.id,
     )
-    
+
     bookmarks = [
         BookmarkResponse(
             id=row["id"],
@@ -98,16 +103,16 @@ async def get_cluster(
             title=row["title"],
             tags=row["tags"] or [],
             status=row["status"],
-            cluster_id=row["cluster_id"],
-            cluster_label=row["cluster_label"],
+            cluster_id=None,
+            cluster_label=None,
             created_at=row["created_at"],
         )
         for row in bookmark_rows
     ]
-    
+
     return ClusterDetail(
-        cluster_id=cluster_row["cluster_id"],
-        label=cluster_row["label"],
+        id=cluster_row["id"],
+        label=cluster_row["label"] or "Untitled",
         size=cluster_row["size"],
         bookmarks=bookmarks,
     )

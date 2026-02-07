@@ -27,7 +27,7 @@ export default function ClusterDetail({ cluster }: ClusterDetailProps) {
       {/* Cluster header */}
       <div className="bg-white rounded-lg shadow p-6">
         <h2 className="text-xl font-semibold text-gray-900">
-          {cluster.label || `Cluster ${cluster.cluster_id}`}
+          {cluster.label || `그룹 ${cluster.id.slice(0, 8)}`}
         </h2>
         <p className="text-gray-600 mt-1">{cluster.size}개의 북마크</p>
         

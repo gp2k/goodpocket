@@ -85,12 +85,12 @@ class BookmarkListResponse(BaseModel):
 
 
 class ClusterResponse(BaseModel):
-    """Cluster summary for list views."""
-    cluster_id: int
+    """Cluster (dup_group) summary for list views."""
+    id: UUID
     label: Optional[str] = None
     size: int
     updated_at: datetime
-    
+
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -101,8 +101,8 @@ class ClusterListResponse(BaseModel):
 
 
 class ClusterDetail(BaseModel):
-    """Cluster with its bookmarks."""
-    cluster_id: int
+    """Cluster (dup_group) with its bookmarks."""
+    id: UUID
     label: Optional[str] = None
     size: int
     bookmarks: list[BookmarkResponse]

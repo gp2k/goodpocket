@@ -44,7 +44,7 @@ export default function Clusters() {
 
     const loadClusterDetail = async () => {
       try {
-        const detail = await clustersApi.get(parseInt(clusterId))
+        const detail = await clustersApi.get(clusterId)
         setSelectedCluster(detail)
       } catch (err) {
         setError(err instanceof Error ? err.message : '클러스터 상세를 불러오는 중 오류가 발생했습니다')
@@ -55,7 +55,7 @@ export default function Clusters() {
   }, [clusterId])
 
   const handleSelectCluster = (cluster: Cluster) => {
-    navigate(`/clusters/${cluster.cluster_id}`)
+    navigate(`/clusters/${cluster.id}`)
   }
 
   const handleBack = () => {

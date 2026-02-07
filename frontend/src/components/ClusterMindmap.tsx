@@ -15,7 +15,7 @@ interface ClusterMindmapProps {
 }
 
 interface ExpandedClusters {
-  [key: number]: ClusterDetail | null
+  [key: string]: ClusterDetail | null
 }
 
 interface MindmapNode extends SimulationNodeDatum {
@@ -24,7 +24,7 @@ interface MindmapNode extends SimulationNodeDatum {
   label: string
   size?: number
   url?: string
-  clusterId?: number
+  clusterId?: string
   radius: number
   x?: number
   y?: number
@@ -50,7 +50,7 @@ interface ClusterSector {
 
 export default function ClusterMindmap({ clusters }: ClusterMindmapProps) {
   const [expandedClusters, setExpandedClusters] = useState<ExpandedClusters>({})
-  const [loadingCluster, setLoadingCluster] = useState<number | null>(null)
+  const [loadingCluster, setLoadingCluster] = useState<string | null>(null)
   const [nodes, setNodes] = useState<MindmapNode[]>([])
   const [links, setLinks] = useState<MindmapLink[]>([])
   const [isSimulating, setIsSimulating] = useState(true)
@@ -62,7 +62,7 @@ export default function ClusterMindmap({ clusters }: ClusterMindmapProps) {
   const clusterPositionsRef = useRef<Map<string, SavedPosition>>(new Map())
   
   // Sector boundaries for each cluster
-  const clusterSectorsRef = useRef<Map<number, ClusterSector>>(new Map())
+  const clusterSectorsRef = useRef<Map<string, ClusterSector>>(new Map())
 
   // Zoom and Pan state
   const [scale, setScale] = useState(0.85)
@@ -96,21 +96,21 @@ export default function ClusterMindmap({ clusters }: ClusterMindmapProps) {
 
     // Cluster nodes
     clusters.forEach((cluster, index) => {
-      const clusterId = `cluster-${cluster.cluster_id}`
+      const clusterNodeId = `cluster-${cluster.id}`
       const angle = (2 * Math.PI * index) / clusters.length - Math.PI / 2
       const initialRadius = 280
       
       // Check if we have a saved position for this cluster
-      const savedPos = clusterPositionsRef.current.get(clusterId)
+      const savedPos = clusterPositionsRef.current.get(clusterNodeId)
       
       if (initialLayoutDone && savedPos) {
         // Use saved fixed position
         newNodes.push({
-          id: clusterId,
+          id: clusterNodeId,
           type: 'cluster',
-          label: cluster.label || `클러스터 ${cluster.cluster_id}`,
+          label: cluster.label || `그룹 ${cluster.id.slice(0, 8)}`,
           size: cluster.size,
-          clusterId: cluster.cluster_id,
+          clusterId: cluster.id,
           radius: 55,
           x: savedPos.x,
           y: savedPos.y,
@@ -120,11 +120,11 @@ export default function ClusterMindmap({ clusters }: ClusterMindmapProps) {
       } else {
         // Initial position (will be adjusted by simulation)
         newNodes.push({
-          id: clusterId,
+          id: clusterNodeId,
           type: 'cluster',
-          label: cluster.label || `클러스터 ${cluster.cluster_id}`,
+          label: cluster.label || `그룹 ${cluster.id.slice(0, 8)}`,
           size: cluster.size,
-          clusterId: cluster.cluster_id,
+          clusterId: cluster.id,
           radius: 55,
           x: CENTER_X + Math.cos(angle) * initialRadius,
           y: CENTER_Y + Math.sin(angle) * initialRadius,
@@ -133,14 +133,14 @@ export default function ClusterMindmap({ clusters }: ClusterMindmapProps) {
 
       newLinks.push({
         source: 'root',
-        target: clusterId,
+        target: clusterNodeId,
       })
 
       // Bookmark nodes (if expanded)
-      const expanded = expandedClusters[cluster.cluster_id]
+      const expanded = expandedClusters[cluster.id]
       if (expanded) {
         // Get cluster position for bookmark placement
-        const clusterPos = clusterPositionsRef.current.get(clusterId) || {
+        const clusterPos = clusterPositionsRef.current.get(clusterNodeId) || {
           x: CENTER_X + Math.cos(angle) * initialRadius,
           y: CENTER_Y + Math.sin(angle) * initialRadius,
         }
@@ -162,14 +162,14 @@ export default function ClusterMindmap({ clusters }: ClusterMindmapProps) {
             type: 'bookmark',
             label: bookmark.title || '(제목 없음)',
             url: bookmark.url,
-            clusterId: cluster.cluster_id,
+            clusterId: cluster.id,
             radius: 55,
             x: clusterPos.x + Math.cos(bookmarkAngle) * bookmarkDistance,
             y: clusterPos.y + Math.sin(bookmarkAngle) * bookmarkDistance,
           })
 
           newLinks.push({
-            source: clusterId,
+            source: clusterNodeId,
             target: `bookmark-${bookmark.id}`,
           })
         })
@@ -323,7 +323,7 @@ export default function ClusterMindmap({ clusters }: ClusterMindmapProps) {
     
     clusters.forEach((cluster, index) => {
       const centerAngle = (2 * Math.PI * index) / clusters.length - Math.PI / 2
-      clusterSectorsRef.current.set(cluster.cluster_id, {
+      clusterSectorsRef.current.set(cluster.id, {
         centerAngle,
         startAngle: centerAngle - sectorSize / 2 + padding,
         endAngle: centerAngle + sectorSize / 2 - padding,
@@ -381,7 +381,7 @@ export default function ClusterMindmap({ clusters }: ClusterMindmapProps) {
   }
 
   const toggleCluster = async (cluster: Cluster) => {
-    const clusterId = cluster.cluster_id
+    const clusterId = cluster.id
 
     if (expandedClusters[clusterId]) {
       setExpandedClusters((prev) => {
@@ -539,7 +539,7 @@ export default function ClusterMindmap({ clusters }: ClusterMindmapProps) {
 
           // Cluster Node
           if (node.type === 'cluster') {
-            const cluster = clusters.find(c => c.cluster_id === node.clusterId)
+            const cluster = clusters.find(c => c.id === node.clusterId)
             if (!cluster) return null
             
             const isExpanded = !!expandedClusters[node.clusterId!]
